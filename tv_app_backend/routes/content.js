@@ -329,4 +329,63 @@ router.get('/images/:userId', auth, async (req, res) => {
   }
 });
 
+// Update endpoint untuk menghapus gambar
+router.delete('/images/:id', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Dapatkan informasi gambar dari database
+    const [image] = await db.query(
+      'SELECT image_urls FROM contents WHERE id = ? AND type = "image"', 
+      [id]
+    );
+    
+    if (!image) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Image not found' 
+      });
+    }
+
+    // Hapus file fisik jika ada
+    if (image.image_urls) {
+      const filePath = path.join(__dirname, '..', 'public', image.image_urls);
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+          console.log('File fisik berhasil dihapus:', filePath);
+        } catch (err) {
+          console.error('Error menghapus file fisik:', err);
+          // Lanjutkan proses meskipun file fisik gagal dihapus
+        }
+      }
+    }
+
+    // Hapus record dari database
+    const [result] = await db.query(
+      'DELETE FROM contents WHERE id = ? AND type = "image"', 
+      [id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Image not found or already deleted'
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Image deleted successfully' 
+    });
+  } catch (error) {
+    console.error('Error deleting image:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to delete image',
+      error: error.message 
+    });
+  }
+});
+
 module.exports = router; 

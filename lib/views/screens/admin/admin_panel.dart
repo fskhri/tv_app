@@ -724,31 +724,47 @@ class _AdminPanelState extends State<AdminPanel> {
                 final image = snapshot.data![index];
                 return Card(
                   clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    onTap: () => _showImageDetails(image),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: Image.network(
-                            image['imageUrl'],
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Center(child: Icon(Icons.error));
-                            },
-                          ),
+                  child: Stack(
+                    children: [
+                      InkWell(
+                        onTap: () => _showImageDetails(image),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: Image.network(
+                                image['imageUrl'],
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Center(child: Icon(Icons.error));
+                                },
+                              ),
+                            ),
+                            Padding(
+                              padding: EdgeInsets.all(4),
+                              child: Text(
+                                image['title'] ?? 'No Title',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ],
                         ),
-                        Padding(
-                          padding: EdgeInsets.all(4),
-                          child: Text(
-                            image['title'] ?? 'No Title',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 12),
+                      ),
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: IconButton(
+                          icon: Icon(
+                            Icons.delete,
+                            color: Colors.red,
                           ),
+                          onPressed: () =>
+                              _showDeleteConfirmation(image['id'].toString()),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 );
               },
@@ -806,6 +822,50 @@ class _AdminPanelState extends State<AdminPanel> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // Tambahkan method untuk menghapus gambar
+  Future<void> _deleteImage(String imageId) async {
+    try {
+      final apiService = Provider.of<ApiService>(context, listen: false);
+      await apiService.deleteImage(imageId);
+
+      // Refresh daftar gambar
+      setState(() {
+        // Ini akan memicu rebuild widget dan memuat ulang daftar gambar
+      });
+
+      _showSuccessSnackBar('Gambar berhasil dihapus');
+    } catch (e) {
+      _showErrorSnackBar('Gagal menghapus gambar: $e');
+    }
+  }
+
+  // Tambahkan dialog konfirmasi hapus
+  void _showDeleteConfirmation(String imageId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Konfirmasi Hapus'),
+        content: Text('Apakah Anda yakin ingin menghapus gambar ini?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteImage(imageId);
+            },
+            child: Text(
+              'Hapus',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
       ),
     );
   }

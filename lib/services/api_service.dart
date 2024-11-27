@@ -568,4 +568,25 @@ class ApiService {
       throw Exception('Error getting images: $e');
     }
   }
+
+  Future<void> deleteImage(String imageId) async {
+    try {
+      if (_token == null) throw Exception('No token available');
+
+      final response = await http.delete(
+        Uri.parse('$baseUrl/content/images/$imageId'),
+        headers: _getHeaders(),
+      );
+
+      print('Delete image response: ${response.statusCode} - ${response.body}');
+
+      if (response.statusCode != 200) {
+        final errorData = json.decode(response.body);
+        throw Exception(errorData['message'] ?? 'Gagal menghapus gambar');
+      }
+    } catch (e) {
+      print('Error deleting image: $e');
+      throw Exception('Error menghapus gambar: $e');
+    }
+  }
 }
