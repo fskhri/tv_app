@@ -6,12 +6,15 @@ import 'dart:convert';
 import '../models/mosque_model.dart';
 import 'package:intl/intl.dart';
 import '../services/database_service.dart';
+import '../services/api_service.dart';
+import '../helpers/database_helper.dart';
 
 class PrayerController extends ChangeNotifier {
-  final DatabaseService _databaseService;
-  
-  PrayerController(this._databaseService);
-  
+  final ApiService _apiService = ApiService();
+  final DatabaseHelper _dbHelper = DatabaseHelper.instance;
+
+  PrayerController();
+
   Map<String, DateTime>? _todayPrayers;
   List<Map<String, dynamic>>? _monthlySchedule;
   String? _selectedProvince;
@@ -32,9 +35,8 @@ class PrayerController extends ChangeNotifier {
 
   // Method untuk mendapatkan daftar provinsi
   Future<List<Map<String, dynamic>>> getProvinces() async {
-    final response = await http.get(
-      Uri.parse('https://jadwalsholat-silk.vercel.app/api/provinsi')
-    );
+    final response = await http
+        .get(Uri.parse('https://jadwalsholat-silk.vercel.app/api/provinsi'));
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -45,9 +47,8 @@ class PrayerController extends ChangeNotifier {
 
   // Method untuk mendapatkan daftar kota
   Future<List<Map<String, dynamic>>> getCities(String province) async {
-    final response = await http.get(
-      Uri.parse('https://jadwalsholat-silk.vercel.app/api/kota?provinsi=$province')
-    );
+    final response = await http.get(Uri.parse(
+        'https://jadwalsholat-silk.vercel.app/api/kota?provinsi=$province'));
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -75,8 +76,7 @@ class PrayerController extends ChangeNotifier {
 
         // Dapatkan posisi
         final position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high
-        );
+            desiredAccuracy: LocationAccuracy.high);
 
         // Dapatkan alamat dari koordinat
         List<Placemark> placemarks = await placemarkFromCoordinates(
@@ -86,7 +86,8 @@ class PrayerController extends ChangeNotifier {
 
         if (placemarks.isNotEmpty) {
           final place = placemarks.first;
-          province = _formatProvinceName(place.administrativeArea ?? 'dki jakarta');
+          province =
+              _formatProvinceName(place.administrativeArea ?? 'dki jakarta');
           city = _formatCityName(place.subAdministrativeArea ?? 'kota jakarta');
         }
       } catch (e) {
@@ -96,7 +97,6 @@ class PrayerController extends ChangeNotifier {
 
       // Update jadwal sholat dengan lokasi yang didapat atau default
       await updatePrayerTimes(province, city);
-      
     } catch (e) {
       print('Error updating prayer times: $e');
       throw Exception('Failed to update prayer times');
@@ -125,22 +125,19 @@ class PrayerController extends ChangeNotifier {
   Future<void> updatePrayerTimes(String province, String city) async {
     _selectedProvince = province;
     _selectedCity = city;
-    
+
     try {
       final now = DateTime.now();
-      final response = await http.get(
-        Uri.parse(
-          'https://jadwalsholat-silk.vercel.app/api/cari?provinsi=$province&kota=$city&bulan=${now.month}&tahun=${now.year}'
-        )
-      );
+      final response = await http.get(Uri.parse(
+          'https://jadwalsholat-silk.vercel.app/api/cari?provinsi=$province&kota=$city&bulan=${now.month}&tahun=${now.year}'));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         _monthlySchedule = List<Map<String, dynamic>>.from(data['data']);
-        
+
         // Simpan ke database lokal
-        await _databaseService.savePrayerSchedules(_monthlySchedule!);
-        
+        await _dbHelper.savePrayerSchedules(_monthlySchedule!);
+
         _updateTodayPrayers();
         notifyListeners();
       } else {
@@ -150,7 +147,7 @@ class PrayerController extends ChangeNotifier {
       print('Error fetching online data: $e');
       // Jika gagal ambil data online, coba ambil dari database lokal
       try {
-        _monthlySchedule = await _databaseService.getPrayerSchedules();
+        _monthlySchedule = await _dbHelper.getPrayerSchedules();
         if (_monthlySchedule != null && _monthlySchedule!.isNotEmpty) {
           _updateTodayPrayers();
           notifyListeners();
@@ -159,7 +156,8 @@ class PrayerController extends ChangeNotifier {
         }
       } catch (localError) {
         print('Error fetching local data: $localError');
-        throw Exception('Failed to load prayer times from both online and local sources');
+        throw Exception(
+            'Failed to load prayer times from both online and local sources');
       }
     }
   }
@@ -232,7 +230,7 @@ class PrayerController extends ChangeNotifier {
     if (nextPrayer == null && _monthlySchedule != null) {
       final tomorrow = DateTime.now().add(Duration(days: 1));
       final tomorrowKey = DateFormat('yyyy-MM-dd').format(tomorrow);
-      
+
       // Cari jadwal untuk besok
       final tomorrowSchedule = _monthlySchedule!.firstWhere(
         (schedule) => schedule['key'] == tomorrowKey,
@@ -251,22 +249,22 @@ class PrayerController extends ChangeNotifier {
   Duration? getCountdown() {
     final (nextPrayer, _) = getNextPrayer();
     if (nextPrayer == null) return null;
-    
+
     return nextPrayer.difference(DateTime.now());
   }
 
   // Method untuk format countdown yang lebih informatif
   String formatCountdown(Duration? duration) {
     if (duration == null) return '--:--:--';
-    
+
     if (duration.inDays > 0) {
       return '${duration.inDays} hari ${(duration.inHours % 24).toString().padLeft(2, '0')}:${(duration.inMinutes % 60).toString().padLeft(2, '0')}:${(duration.inSeconds % 60).toString().padLeft(2, '0')}';
     }
-    
+
     final hours = duration.inHours.toString().padLeft(2, '0');
     final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
     final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
-    
+
     return '$hours:$minutes:$seconds';
   }
 
@@ -279,5 +277,31 @@ class PrayerController extends ChangeNotifier {
       orElse: () => _monthlySchedule!.first,
     );
     return today['tanggal'];
+  }
+
+  Future<List<Map<String, dynamic>>> getPrayerSchedules(
+      String province, String city, int month, int year) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+            'https://jadwalsholat-silk.vercel.app/api/cari?provinsi=$province&kota=$city&bulan=$month&tahun=$year'),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = json.decode(response.body);
+        return List<Map<String, dynamic>>.from(jsonResponse['data']);
+      } else {
+        throw Exception('Gagal mengambil jadwal sholat');
+      }
+    } catch (e) {
+      print('Error fetching prayer schedules: $e');
+      // Jika gagal, coba ambil dari database lokal
+      try {
+        return await _dbHelper.getPrayerSchedules();
+      } catch (e) {
+        print('Error fetching local data: $e');
+        throw e;
+      }
+    }
   }
 }

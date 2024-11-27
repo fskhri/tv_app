@@ -2,6 +2,11 @@ const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../config/database');
+const express = require('express');
+
+// Middleware dan model yang diperlukan
+const authMiddleware = require('../middleware/auth');
+const UserLocation = require('../models/UserLocation');
 
 router.post('/login', async (req, res) => {
   try {
@@ -43,6 +48,19 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ message: error.message });
+  }
+});
+
+// Tambahkan lokasi pengguna
+router.post('/user-locations', authMiddleware, async (req, res) => {
+  try {
+    const { userId, province, city } = req.body;
+    const newUserLocation = new UserLocation({ userId, province, city });
+    await newUserLocation.save();
+    res.status(201).send(newUserLocation);
+  } catch (error) {
+    console.error('Error adding user location:', error);
+    res.status(400).send({ error: 'Failed to add user location' });
   }
 });
 

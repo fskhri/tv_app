@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:tv_app/views/screens/admin/user_management_screen.dart';
 import 'package:tv_app/views/widgets/prayer_time_widget.dart';
 import 'package:tv_app/views/widgets/running_text_widget.dart';
 import '../../services/sync_service.dart';
 import '../../controllers/prayer_controller.dart';
 import 'dart:async';
-import 'user_management_screen.dart';
 
 class MainScreen extends StatefulWidget {
   final bool isAdmin;

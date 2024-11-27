@@ -17,12 +17,10 @@ import 'package:get/get.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Inisialisasi database
+
   final databaseService = DatabaseService();
   await databaseService.database;
 
-  // Inisialisasi AuthController
   final authController = AuthController();
   await authController.init();
 
@@ -37,12 +35,12 @@ void main() async {
           create: (context) => ApiService(),
         ),
         ChangeNotifierProvider<PrayerController>(
-          create: (_) => PrayerController(databaseService),
+          create: (_) => PrayerController(),
         ),
         Provider<SyncService>(
           create: (context) => SyncService(
-            Provider.of<DatabaseService>(context, listen: false),
-            Provider.of<AuthController>(context, listen: false),
+            databaseService,
+            authController,
           ),
         ),
         Provider<MosqueRepository>(

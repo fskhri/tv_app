@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:tv_app/models/user_location.dart';
 import 'package:tv_app/models/prayer_schedule.dart';
 import '../models/user.dart' as user_model;
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.0.109:3000';
+  static const String baseUrl = 'https://0g7d00kv-3000.asse.devtunnels.ms';
   String? _token;
 
   void setToken(String token) {
@@ -34,13 +35,16 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final List<dynamic> usersData = json.decode(response.body);
-        
-        return usersData.map((userData) => user_model.User(
-          id: userData['id'].toString(),
-          username: userData['username'].toString(),
-          role: userData['role'].toString(),
-          isActive: userData['is_active'] == 1 || userData['isActive'] == true,
-        )).toList();
+
+        return usersData
+            .map((userData) => user_model.User(
+                  id: userData['id'].toString(),
+                  username: userData['username'].toString(),
+                  role: userData['role'].toString(),
+                  isActive: userData['is_active'] == 1 ||
+                      userData['isActive'] == true,
+                ))
+            .toList();
       }
       throw Exception('Failed to load users: ${response.body}');
     } catch (e) {
@@ -49,7 +53,8 @@ class ApiService {
     }
   }
 
-  Future<user_model.User> createUser(String username, String password, String role) async {
+  Future<user_model.User> createUser(
+      String username, String password, String role) async {
     try {
       if (_token == null) throw Exception('No token available');
 
@@ -119,27 +124,33 @@ class ApiService {
     }
   }
 
-  Future<List<PrayerSchedule>> getPrayerSchedules() async {
+  Future<List<PrayerSchedule>> getPrayerSchedules(
+      String province, String city, int month, int year) async {
     try {
-      if (_token == null) throw Exception('No token available');
-
       final response = await http.get(
-        Uri.parse('$baseUrl/prayer-schedules'),
-        headers: _getHeaders(),
+        Uri.parse(
+            'https://jadwalsholat-silk.vercel.app/api/cari?provinsi=$province&kota=$city&bulan=$month&tahun=$year'),
       );
 
       if (response.statusCode == 200) {
-        final List data = json.decode(response.body)['data'];
-        return data.map((item) => PrayerSchedule.fromMap(item)).toList();
+        final Map<String, dynamic> jsonResponse = json.decode(response.body);
+        final List<dynamic> data = jsonResponse['data'];
+        return data
+            .map((schedule) => PrayerSchedule.fromJson(schedule))
+            .toList();
+      } else {
+        throw Exception('Gagal mengambil jadwal sholat');
       }
-      throw Exception('Gagal mengambil jadwal sholat');
     } catch (e) {
+      print('Error fetching prayer schedules: $e');
       throw Exception('Error: $e');
     }
   }
 
   Future<Map<String, dynamic>?> login(String username, String password) async {
     try {
+      print('Attempting login for username: $username');
+      
       final response = await http.post(
         Uri.parse('$baseUrl/auth/login'),
         headers: {'Content-Type': 'application/json'},
@@ -154,13 +165,17 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        _token = data['token']; // Simpan token
+        _token = data['token'];
+        print('Login successful, token received: $_token');
         return data;
+      } else {
+        final errorData = json.decode(response.body);
+        print('Login failed: ${errorData['message']}');
+        throw Exception(errorData['message']);
       }
-      return null;
     } catch (e) {
       print('Login error: $e');
-      return null;
+      rethrow;
     }
   }
 
@@ -180,6 +195,196 @@ class ApiService {
     } catch (e) {
       print('Error updating user: $e');
       throw Exception('Failed to update user: $e');
+    }
+  }
+
+  Future<String> getUserId(String username) async {
+    final url = '$baseUrl/api/user-locations/user-id/$username';
+    final response = await http.get(Uri.parse(url));
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['user_id'];
+    } else {
+      throw Exception('Failed to get user ID');
+    }
+  }
+
+  Future<void> addUserLocation(String userId, String province, String city) async {
+    try {
+      if (_token == null) throw Exception('No token available');
+
+      print('Attempting to add/update location for userId: $userId');
+      print('Province: $province, City: $city');
+
+      // Cek dulu apakah user sudah punya lokasi
+      final checkResponse = await http.get(
+        Uri.parse('$baseUrl/user-locations/check/$userId'),
+        headers: _getHeaders(),
+      );
+
+      print('Check existing location response: ${checkResponse.statusCode}');
+      print('Check response body: ${checkResponse.body}');
+
+      if (checkResponse.statusCode == 200) {
+        // User sudah punya lokasi, lakukan update
+        print('User location exists, performing update');
+        final updateResponse = await http.put(
+          Uri.parse('$baseUrl/user-locations/$userId'),
+          headers: _getHeaders(),
+          body: json.encode({
+            'province': province,
+            'city': city,
+          }),
+        );
+
+        print('Update response status: ${updateResponse.statusCode}');
+        print('Update response body: ${updateResponse.body}');
+
+        if (updateResponse.statusCode != 200) {
+          throw Exception('Failed to update location: ${updateResponse.body}');
+        }
+      } else {
+        // User belum punya lokasi, buat baru
+        print('User location does not exist, creating new');
+        final createResponse = await http.post(
+          Uri.parse('$baseUrl/user-locations'),
+          headers: _getHeaders(),
+          body: json.encode({
+            'user_id': userId,
+            'province': province,
+            'city': city,
+          }),
+        );
+
+        print('Create response status: ${createResponse.statusCode}');
+        print('Create response body: ${createResponse.body}');
+
+        if (createResponse.statusCode != 201) {
+          throw Exception('Failed to create location: ${createResponse.body}');
+        }
+      }
+    } catch (e) {
+      print('Error in addUserLocation: $e');
+      throw Exception('Failed to add/update user location: $e');
+    }
+  }
+
+  Future<List<UserLocation>> fetchUserLocations() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/user-locations'),
+        headers: _getHeaders(),
+      );
+
+      print('Fetch response status: ${response.statusCode}');
+      print('Fetch response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> locationsData = json.decode(response.body);
+        return locationsData
+            .map((data) => UserLocation.fromJson(data))
+            .toList();
+      } else {
+        throw Exception('Failed to load user locations');
+      }
+    } catch (e) {
+      print('Error fetching user locations: $e');
+      throw e;
+    }
+  }
+
+  Future<List<Map<String, String>>> getProvinces() async {
+    final response = await http
+        .get(Uri.parse('https://jadwalsholat-silk.vercel.app/api/provinsi'));
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body)['data'];
+      return data
+          .map((item) =>
+              {'id': item['id'].toString(), 'name': item['name'].toString()})
+          .toList();
+    }
+    throw Exception('Failed to load provinces');
+  }
+
+  Future<List<Map<String, String>>> getCities(String provinceId) async {
+    print('Fetching cities for province ID: $provinceId');
+    final response = await http.get(Uri.parse(
+        'https://jadwalsholat-silk.vercel.app/api/kota?provinsi=$provinceId'));
+    print('Response status: ${response.statusCode}');
+    print('Response body: ${response.body}');
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body)['data'];
+      return data
+          .map((item) =>
+              {'id': item['id'].toString(), 'name': item['name'].toString()})
+          .toList();
+    }
+    throw Exception('Failed to load cities');
+  }
+
+  Future<List<UserLocation>> getUserLocations() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/user-locations'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        List<dynamic> jsonData = json.decode(response.body);
+        return jsonData.map((data) => UserLocation.fromJson(data)).toList();
+      } else {
+        throw Exception('Gagal mengambil data lokasi');
+      }
+    } catch (e) {
+      throw Exception('Error: $e');
+    }
+  }
+
+  Future<void> updateUserLocation(String userId, String province, String city) async {
+    try {
+      print('Updating location for userId: $userId');
+      print('Data: province=$province, city=$city');
+      
+      // Hanya kirim data yang diperlukan
+      final requestBody = {
+        'userId': userId,
+        'province': province,
+        'city': city,
+      };
+      
+      print('Request body: $requestBody'); // Tambah logging
+      
+      final response = await http.post(
+        Uri.parse('$baseUrl/user-locations/update-location'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': _token != null ? 'Bearer $_token' : '',
+        },
+        body: jsonEncode(requestBody), // Gunakan requestBody yang sudah dibuat
+      );
+
+      print('Update response status: ${response.statusCode}');
+      print('Update response body: ${response.body}');
+
+      if (response.statusCode != 200) {
+        try {
+          final errorData = jsonDecode(response.body);
+          throw Exception(errorData['message'] ?? 'Gagal memperbarui lokasi pengguna');
+        } catch (e) {
+          throw Exception('Gagal memperbarui lokasi pengguna: Status ${response.statusCode}');
+        }
+      }
+
+      final data = jsonDecode(response.body);
+      if (!data['success']) {
+        throw Exception(data['message'] ?? 'Gagal memperbarui lokasi pengguna');
+      }
+    } catch (e) {
+      print('Error in updateUserLocation: $e');
+      rethrow;
     }
   }
 }

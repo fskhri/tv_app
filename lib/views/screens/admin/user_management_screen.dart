@@ -27,6 +27,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     });
   }
 
+  void _showAddLocationDialog(BuildContext context, String userId) {
+    // Implementasi dialog untuk input provinsi dan kota
+  }
+
   Future<void> _showAddEditUserDialog([UserModel? user]) async {
     final formKey = GlobalKey<FormState>();
     final usernameController = TextEditingController(text: user?.username);
