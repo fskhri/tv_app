@@ -19,7 +19,7 @@ class _PrayerTimeWidgetState extends State<PrayerTimeWidget> {
       final controller = Provider.of<PrayerController>(context, listen: false);
       controller.updatePrayerTimesByGPS();
     });
-    
+
     _timer = Timer.periodic(Duration(seconds: 1), (_) {
       setState(() {});
     });

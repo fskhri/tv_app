@@ -8,255 +8,179 @@ const fs = require('fs');
 
 // Konfigurasi multer untuk upload gambar
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = 'public/uploads';
-    // Buat direktori jika belum ada
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
+  destination: function(req, file, cb) {
+    const dir = 'public/uploads';
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
     }
-    cb(null, uploadDir);
+    cb(null, dir);
   },
-  filename: (req, file, cb) => {
+  filename: function(req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
+    cb(null, 'image-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
+
+const fileFilter = (req, file, cb) => {
+  const allowedMimes = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'application/octet-stream'
+  ];
+
+  console.log('File upload attempt:', {
+    fieldname: file.fieldname,
+    originalname: file.originalname,
+    mimetype: file.mimetype
+  });
+
+  if (allowedMimes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error(`File type ${file.mimetype} not allowed`));
+  }
+};
 
 const upload = multer({
   storage: storage,
+  fileFilter: fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024 // Limit 5MB per file
-  },
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-
-    if (extname && mimetype) {
-      return cb(null, true);
-    } else {
-      cb('Error: Images only!');
-    }
+    fileSize: 5 * 1024 * 1024
   }
-});
+}).array('images', 10);
 
-// Get all contents
-router.get('/', async (req, res) => {
-  try {
-    const [contents] = await db.query(
-      'SELECT * FROM contents WHERE is_active = true ORDER BY created_at DESC'
-    );
-    
-    const contentsWithFullUrl = contents.map(content => ({
-      ...content,
-      image_urls: content.image_urls ? 
-        content.image_urls.split('|').map(url => 
-          `${req.protocol}://${req.get('host')}/${url}`
-        ) : []
-    }));
-    
-    res.json(contentsWithFullUrl);
-  } catch (error) {
-    console.error('Get contents error:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
+// POST /content - Create new content
+router.post('/', auth, (req, res) => {
+  upload(req, res, async function(err) {
+    console.log('Upload request received');
+    console.log('Files:', req.files);
+    console.log('Body:', req.body);
 
-// Add new content with image (admin only)
-router.post('/', auth, admin, upload.array('images', 10), async (req, res) => {
-  try {
-    const { title, description, type } = req.body;
-    
-    if (!title || !type) {
-      return res.status(400).json({ message: 'Title and type are required' });
+    if (err instanceof multer.MulterError) {
+      console.error('Multer error:', err);
+      return res.status(400).json({
+        success: false,
+        message: `Upload error: ${err.message}`
+      });
+    } else if (err) {
+      console.error('Unknown error:', err);
+      return res.status(400).json({
+        success: false,
+        message: err.message
+      });
     }
 
-    let image_urls = [];
-    if (req.files && req.files.length > 0) {
-      image_urls = req.files.map(file => `uploads/${file.filename}`);
-    }
+    try {
+      const { userId, title, description } = req.body;
+      console.log('Attempting to save content with:', { userId, title, description });
 
-    const [result] = await db.query(
-      'INSERT INTO contents (title, description, image_urls, type) VALUES (?, ?, ?, ?)',
-      [title, description, image_urls.join('|'), type]
-    );
+      if (!userId || !title) {
+        return res.status(400).json({
+          success: false,
+          message: 'userId and title are required'
+        });
+      }
 
-    res.status(201).json({
-      id: result.insertId,
-      title,
-      description,
-      image_urls: image_urls.map(url => `${req.protocol}://${req.get('host')}/${url}`),
-      type
-    });
-  } catch (error) {
-    console.error('Add content error:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
+      let imageUrls = [];
+      if (req.files && req.files.length > 0) {
+        imageUrls = req.files.map(file => `uploads/${file.filename}`);
+        console.log('Image URLs:', imageUrls);
+      }
 
-// Update content with image (admin only)
-router.put('/:id', auth, admin, upload.array('images', 10), async (req, res) => {
-  try {
-    const { title, description, type, is_active, keep_images } = req.body;
-    const contentId = req.params.id;
-    const keepImageIndexes = keep_images ? keep_images.split(',').map(Number) : [];
+      console.log('Executing database query with values:', {
+        userId,
+        title,
+        description,
+        imageUrls: imageUrls.join('|'),
+        type: 'image'
+      });
 
-    // Get existing content
-    const [existingContent] = await db.query(
-      'SELECT image_urls FROM contents WHERE id = ?',
-      [contentId]
-    );
-
-    let existingImages = existingContent[0]?.image_urls ? 
-      existingContent[0].image_urls.split('|') : [];
-
-    // Keep selected existing images
-    if (keepImageIndexes.length > 0) {
-      existingImages = existingImages.filter((_, index) => 
-        keepImageIndexes.includes(index)
+      const [result] = await db.query(
+        'INSERT INTO contents (user_id, title, description, image_urls, type) VALUES (?, ?, ?, ?, ?)',
+        [userId, title, description, imageUrls.join('|'), 'image']
       );
-    } else {
-      // Delete all existing images if none selected to keep
-      existingImages.forEach(imageUrl => {
-        const imagePath = path.join(__dirname, '..', 'public', imageUrl);
-        if (fs.existsSync(imagePath)) {
-          fs.unlinkSync(imagePath);
+
+      console.log('Content saved to database:', result);
+
+      res.status(200).json({
+        success: true,
+        message: 'Content uploaded successfully',
+        data: {
+          id: result.insertId,
+          title,
+          description,
+          imageUrls: imageUrls.map(url => `${req.protocol}://${req.get('host')}/${url}`)
         }
       });
-      existingImages = [];
-    }
-
-    // Add new images
-    let newImageUrls = [];
-    if (req.files && req.files.length > 0) {
-      newImageUrls = req.files.map(file => `uploads/${file.filename}`);
-    }
-
-    // Combine kept existing images with new images
-    const finalImageUrls = [...existingImages, ...newImageUrls];
-
-    const [result] = await db.query(
-      `UPDATE contents 
-       SET title = ?, description = ?, image_urls = ?, type = ?, is_active = ?
-       WHERE id = ?`,
-      [title, description, finalImageUrls.join('|'), type, is_active, contentId]
-    );
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Content not found' });
-    }
-
-    res.json({ 
-      message: 'Content updated successfully',
-      image_urls: finalImageUrls.map(url => 
-        `${req.protocol}://${req.get('host')}/${url}`
-      )
-    });
-  } catch (error) {
-    console.error('Update content error:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Delete content and its image (admin only)
-router.delete('/:id', auth, admin, async (req, res) => {
-  try {
-    const [content] = await db.query(
-      'SELECT image_urls FROM contents WHERE id = ?',
-      [req.params.id]
-    );
-
-    if (content[0]?.image_urls) {
-      const imageUrls = content[0].image_urls.split('|');
-      imageUrls.forEach(imageUrl => {
-        const imagePath = path.join(__dirname, '..', 'public', imageUrl);
-        if (fs.existsSync(imagePath)) {
-          fs.unlinkSync(imagePath);
-        }
+    } catch (error) {
+      console.error('Database error details:', {
+        code: error.code,
+        errno: error.errno,
+        sqlMessage: error.sqlMessage,
+        sql: error.sql
+      });
+      
+      res.status(500).json({
+        success: false,
+        message: 'Error saving content to database',
+        error: error.sqlMessage
       });
     }
-
-    const [result] = await db.query(
-      'DELETE FROM contents WHERE id = ?',
-      [req.params.id]
-    );
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Content not found' });
-    }
-
-    res.json({ message: 'Content deleted successfully' });
-  } catch (error) {
-    console.error('Delete content error:', error);
-    res.status(500).json({ message: error.message });
-  }
+  });
 });
 
-// Get content by ID
-router.get('/:id', async (req, res) => {
+// GET /content/:userId - Get content by user ID
+router.get('/:userId', auth, async (req, res) => {
   try {
-    const [contents] = await db.query(
-      'SELECT * FROM contents WHERE id = ?',
-      [req.params.id]
-    );
-
-    if (contents.length === 0) {
-      return res.status(404).json({ message: 'Content not found' });
-    }
-
-    const content = {
-      ...contents[0],
-      image_urls: contents[0].image_urls ? 
-        contents[0].image_urls.split('|').map(url => 
-          `${req.protocol}://${req.get('host')}/${url}`
-        ) : []
-    };
-
-    res.json(content);
-  } catch (error) {
-    console.error('Get content error:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Update running text (admin only)
-router.put('/running-text/:userId', auth, admin, async (req, res) => {
-  try {
-    const { running_text } = req.body;
     const userId = req.params.userId;
+    console.log('Fetching content for userId:', userId);
 
-    const [result] = await db.query(
-      'UPDATE users SET running_text = ? WHERE id = ?',
-      [running_text, userId]
+    const [contents] = await db.query(
+      `SELECT 
+        id,
+        user_id,
+        title,
+        description,
+        image_urls,
+        type,
+        is_active,
+        created_at,
+        updated_at
+      FROM contents 
+      WHERE user_id = ?
+      ORDER BY created_at DESC`,
+      [userId]
     );
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+    // Transform image_urls from pipe-separated string to array
+    const transformedContents = contents.map(content => ({
+      ...content,
+      image_urls: content.image_urls ? content.image_urls.split('|') : [],
+      // Add full URL for each image
+      image_urls_full: content.image_urls 
+        ? content.image_urls.split('|').map(url => 
+            `${req.protocol}://${req.get('host')}/${url}`
+          )
+        : []
+    }));
 
-    res.json({ message: 'Running text updated successfully' });
+    console.log(`Found ${transformedContents.length} contents for user ${userId}`);
+
+    res.json({
+      success: true,
+      data: transformedContents
+    });
+
   } catch (error) {
-    console.error('Update running text error:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Get running text
-router.get('/running-text/:userId', async (req, res) => {
-  try {
-    const [rows] = await db.query(
-      'SELECT running_text FROM users WHERE id = ?',
-      [req.params.userId]
-    );
-
-    if (rows.length === 0) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    res.json({ running_text: rows[0].running_text });
-  } catch (error) {
-    console.error('Get running text error:', error);
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching contents:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching contents',
+      error: error.message
+    });
   }
 });
 

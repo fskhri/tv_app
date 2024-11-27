@@ -3,6 +3,7 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const db = require('./config/database');
 require('dotenv').config();
+const path = require('path');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -14,6 +15,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.static('public'));
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 // Create tables if not exist
 async function createTables() {
@@ -59,14 +61,16 @@ async function createTables() {
     await db.query(`
       CREATE TABLE IF NOT EXISTS contents (
         id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id VARCHAR(50) NOT NULL,
         title VARCHAR(255) NOT NULL,
         description TEXT,
         image_urls TEXT,
         type ENUM('image', 'text', 'both') NOT NULL,
         is_active BOOLEAN DEFAULT true,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      )
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      ) ENGINE=InnoDB
     `);
     console.log('Contents table created');
   } catch (err) {

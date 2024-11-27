@@ -2,8 +2,6 @@ import 'dart:async';
 import 'package:just_audio/just_audio.dart' as just_audio;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
 import 'dart:convert';
 import '../models/mosque_model.dart';
 import 'package:intl/intl.dart';
@@ -63,37 +61,6 @@ class PrayerController extends ChangeNotifier {
       // Set default location untuk testing (Jakarta)
       String province = 'dki jakarta';
       String city = 'kota jakarta';
-
-      try {
-        // Cek permission lokasi
-        LocationPermission permission = await Geolocator.checkPermission();
-        if (permission == LocationPermission.denied) {
-          permission = await Geolocator.requestPermission();
-          if (permission == LocationPermission.denied) {
-            throw Exception('Location permission denied');
-          }
-        }
-
-        // Dapatkan posisi
-        final position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.high);
-
-        // Dapatkan alamat dari koordinat
-        List<Placemark> placemarks = await placemarkFromCoordinates(
-          position.latitude,
-          position.longitude,
-        );
-
-        if (placemarks.isNotEmpty) {
-          final place = placemarks.first;
-          province =
-              _formatProvinceName(place.administrativeArea ?? 'dki jakarta');
-          city = _formatCityName(place.subAdministrativeArea ?? 'kota jakarta');
-        }
-      } catch (e) {
-        print('Error getting location: $e');
-        // Gunakan lokasi default jika gagal mendapatkan lokasi
-      }
 
       // Update jadwal sholat dengan lokasi yang didapat atau default
       await updatePrayerTimes(province, city);

@@ -11,7 +11,9 @@ const UserLocation = require('../models/UserLocation');
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    console.log('Login attempt:', { username });
+    console.log('=== LOGIN ATTEMPT ===');
+    console.log('Username:', username);
+    console.log('Time:', new Date().toISOString());
 
     const [rows] = await db.query(
       'SELECT * FROM users WHERE username = ?',
@@ -19,34 +21,59 @@ router.post('/login', async (req, res) => {
     );
 
     if (rows.length === 0) {
-      console.log('User not found');
+      console.log('Login failed: User not found');
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     const user = rows[0];
+    console.log('User found:', {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      isActive: user.is_active === 1
+    });
+
     const isMatch = await bcrypt.compare(password, user.password);
+    console.log('Password match:', isMatch);
 
     if (!isMatch) {
+      console.log('Login failed: Invalid password');
       return res.status(401).json({ message: 'Invalid credentials' });
     }
+
+    // Setelah login berhasil, ambil data lokasi user
+    const [userLocations] = await db.query(
+      'SELECT * FROM user_locations WHERE user_id = ?',
+      [user.id]
+    );
+    console.log('User location data:', userLocations[0] || 'No location set');
 
     const token = jwt.sign(
       { userId: user.id, role: user.role },
       process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: '24h' }
     );
+    console.log('Token generated successfully');
 
-    res.json({
+    // Log response data
+    const responseData = {
       token,
       user: {
         id: user.id,
         username: user.username,
         role: user.role,
         isActive: user.is_active === 1
-      }
-    });
+      },
+      location: userLocations[0] || null
+    };
+    console.log('Login response data:', responseData);
+    console.log('=== LOGIN SUCCESSFUL ===');
+
+    res.json(responseData);
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('=== LOGIN ERROR ===');
+    console.error('Error details:', error);
+    console.error('Stack trace:', error.stack);
     res.status(500).json({ message: error.message });
   }
 });

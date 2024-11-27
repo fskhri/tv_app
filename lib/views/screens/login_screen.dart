@@ -91,17 +91,17 @@ class _LoginScreenState extends State<LoginScreen> {
   void _handleLogin() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
-      
+
       try {
         final loginResult = await _apiService.login(
           _usernameController.text,
           _passwordController.text,
         );
-        
+
         if (loginResult != null) {
           final userData = loginResult['user'] as Map<String, dynamic>;
           final userRole = userData['role'] as String;
-          
+
           if (userRole == 'user') {
             Navigator.pushReplacement(
               context,

@@ -38,7 +38,7 @@ class _MainScreenState extends State<MainScreen> {
     try {
       final prayerController =
           Provider.of<PrayerController>(context, listen: false);
-      await prayerController.updatePrayerTimesByGPS();
+      // await prayerController.updatePrayerTimesByGPS();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

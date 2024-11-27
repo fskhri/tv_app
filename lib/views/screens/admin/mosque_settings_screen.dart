@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../models/mosque_model.dart';
 import '../../../repositories/mosque_repository.dart';
-import 'package:geolocator/geolocator.dart';
 
 class MosqueSettingsScreen extends StatefulWidget {
   const MosqueSettingsScreen({Key? key}) : super(key: key);
@@ -45,25 +44,6 @@ class _MosqueSettingsScreenState extends State<MosqueSettingsScreen> {
     }
     
     setState(() => _isLoading = false);
-  }
-
-  Future<void> _getCurrentLocation() async {
-    try {
-      final permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        await Geolocator.requestPermission();
-      }
-
-      final position = await Geolocator.getCurrentPosition();
-      setState(() {
-        _latController.text = position.latitude.toString();
-        _longController.text = position.longitude.toString();
-      });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gagal mendapatkan lokasi')),
-      );
-    }
   }
 
   @override
@@ -131,10 +111,6 @@ class _MosqueSettingsScreenState extends State<MosqueSettingsScreen> {
                         return null;
                       },
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.my_location),
-                    onPressed: _getCurrentLocation,
                   ),
                 ],
               ),

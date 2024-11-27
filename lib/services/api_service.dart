@@ -3,6 +3,9 @@ import 'package:http/http.dart' as http;
 import 'package:tv_app/models/user_location.dart';
 import 'package:tv_app/models/prayer_schedule.dart';
 import '../models/user.dart' as user_model;
+import 'dart:io';
+import 'package:http_parser/http_parser.dart';
+import 'package:path/path.dart' as path;
 
 class ApiService {
   static const String baseUrl = 'https://0g7d00kv-3000.asse.devtunnels.ms';
@@ -386,6 +389,85 @@ class ApiService {
     } catch (e) {
       print('Error saving location: $e');
       throw Exception('Gagal menyimpan lokasi: $e');
+    }
+  }
+
+  Future<void> uploadContent(
+    String userId,
+    String title,
+    String description,
+    List<File> images,
+  ) async {
+    try {
+      print('Memulai upload konten untuk userId: $userId');
+
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/content'),
+      );
+
+      // Tambahkan Authorization header
+      request.headers['Authorization'] = 'Bearer $_token';
+
+      // Tambahkan fields
+      request.fields['userId'] = userId;
+      request.fields['title'] = title;
+      request.fields['description'] = description;
+
+      // Upload gambar
+      for (var i = 0; i < images.length; i++) {
+        var file = images[i];
+        var stream = http.ByteStream(file.openRead());
+        var length = await file.length();
+
+        var multipartFile = http.MultipartFile(
+          'images',
+          stream,
+          length,
+          filename: path.basename(file.path),
+          contentType:
+              MediaType('image', 'jpeg'), // Explicitly set content type
+        );
+
+        request.files.add(multipartFile);
+      }
+
+      var response = await request.send();
+      var responseData = await response.stream.bytesToString();
+
+      if (response.statusCode != 200) {
+        throw Exception('Gagal mengupload konten: $responseData');
+      }
+
+      print('Upload berhasil: $responseData');
+    } catch (e) {
+      print('Error dalam proses upload: $e');
+      throw Exception('Error: $e');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getUserContents(String userId) async {
+    try {
+      if (_token == null) throw Exception('No token available');
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/content/$userId'),
+        headers: _getHeaders(),
+      );
+
+      print('Get contents response: ${response.statusCode} - ${response.body}');
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = json.decode(response.body);
+        if (jsonResponse['success'] == true) {
+          return List<Map<String, dynamic>>.from(jsonResponse['data']);
+        }
+        throw Exception('Failed to get contents: ${jsonResponse['message']}');
+      }
+      throw Exception('Failed to get contents: ${response.body}');
+    } catch (e) {
+      print('Error getting contents: $e');
+      throw Exception('Error getting contents: $e');
     }
   }
 }
