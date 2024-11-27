@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import '../controllers/auth_controller.dart';
+import '../services/auth_service.dart';
 import './main_screen.dart';
+import 'package:provider/provider.dart';
+import '../services/api_service.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -11,20 +13,20 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _authController = AuthController();
   bool _isLoading = false;
 
   Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
       try {
-        final success = await _authController.login(
+        final apiService = Provider.of<ApiService>(context, listen: false);
+        final response = await apiService.login(
           _usernameController.text,
           _passwordController.text,
         );
 
-        if (success) {
-          final isAdmin = await _authController.isAdmin();
+        if (response != null) {
+          final isAdmin = response['user']['role'] == 'admin';
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -33,7 +35,7 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Login gagal. Cek username dan password.')),
+            SnackBar(content: Text('Login gagal')),
           );
         }
       } catch (e) {

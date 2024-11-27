@@ -7,13 +7,13 @@ import '../models/user.dart';
 class AuthController extends ChangeNotifier {
   static const String _tokenKey = 'auth_token';
   static const String _userKey = 'user_data';
-  
+
   late final ApiService _apiService;
   User? _currentUser;
   String? _token;
 
   AuthController() {
-    _apiService = ApiService(this);
+    _apiService = ApiService();
   }
 
   User? get currentUser => _currentUser;
@@ -24,8 +24,10 @@ class AuthController extends ChangeNotifier {
 
   Future<String?> getToken() async {
     if (_token != null) return _token;
+    
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString(_tokenKey);
+    print('Token retrieved from SharedPreferences: $_token');
     return _token;
   }
 
@@ -38,12 +40,19 @@ class AuthController extends ChangeNotifier {
           id: userData['id'] as String,
           username: userData['username'] as String,
           role: userData['role'] as String,
-          isActive: userData['is_active'] == 1 || userData['is_active'] == true,
+          isActive: userData['isActive'] == true,
         );
+        
         _token = response['token'] as String;
+        print('Token to be saved: $_token');
+        
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_tokenKey, _token!);
+        
+        final savedToken = prefs.getString(_tokenKey);
+        print('Token saved in SharedPreferences: $savedToken');
         
         await _saveUserData(_currentUser!);
-        await _saveToken(_token!);
         
         notifyListeners();
         return true;
@@ -55,12 +64,6 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  Future<void> _saveToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token);
-    _token = token;
-  }
-
   Future<void> _saveUserData(User user) async {
     final prefs = await SharedPreferences.getInstance();
     final userMap = {
@@ -70,7 +73,6 @@ class AuthController extends ChangeNotifier {
       'isActive': user.isActive,
     };
     await prefs.setString(_userKey, jsonEncode(userMap));
-    _currentUser = user;
   }
 
   Future<void> _loadSavedUser() async {
@@ -78,6 +80,8 @@ class AuthController extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final userData = prefs.getString(_userKey);
       final token = prefs.getString(_tokenKey);
+      
+      print('Loading saved data - Token: $token, UserData: $userData');
 
       if (userData != null && token != null) {
         final userMap = jsonDecode(userData) as Map<String, dynamic>;
@@ -113,4 +117,4 @@ class AuthController extends ChangeNotifier {
     _token = null;
     notifyListeners();
   }
-} 
+}

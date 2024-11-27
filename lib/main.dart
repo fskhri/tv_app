@@ -34,9 +34,7 @@ void main() async {
           create: (_) => authController,
         ),
         Provider<ApiService>(
-          create: (context) => ApiService(
-            Provider.of<AuthController>(context, listen: false),
-          ),
+          create: (context) => ApiService(),
         ),
         ChangeNotifierProvider<PrayerController>(
           create: (_) => PrayerController(databaseService),

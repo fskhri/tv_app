@@ -162,13 +162,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 formKey.currentState?.save();
                 try {
                   final apiService = Provider.of<ApiService>(context, listen: false);
-                  final newUser = User(
-                    id: 'temp-${DateTime.now().millisecondsSinceEpoch}',
-                    username: username,
-                    role: role,
-                    isActive: true,
+                  await apiService.createUser(
+                    username,
+                    password,
+                    role,
                   );
-                  await apiService.createUser(newUser, password);
                   Navigator.pop(context);
                   loadUsers();
                 } catch (e) {

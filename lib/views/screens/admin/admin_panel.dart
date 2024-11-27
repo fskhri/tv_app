@@ -49,7 +49,11 @@ class _AdminPanelState extends State<AdminPanel> {
           role: _selectedRole,
         );
         
-        await apiService.createUser(newUser, _passwordController.text);
+        await apiService.createUser(
+          newUser.username,
+          _passwordController.text,
+          newUser.role,
+        );
         _loadUsers(); // Refresh daftar user
         _clearForm();
         
