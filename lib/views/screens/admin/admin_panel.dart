@@ -59,7 +59,7 @@ class _AdminPanelState extends State<AdminPanel> {
           username: _usernameController.text,
           role: _selectedRole,
         );
-        
+
         await apiService.createUser(
           newUser.username,
           _passwordController.text,
@@ -67,7 +67,7 @@ class _AdminPanelState extends State<AdminPanel> {
         );
         _loadUsers(); // Refresh daftar user
         _clearForm();
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('User berhasil dibuat')),
         );
@@ -90,7 +90,7 @@ class _AdminPanelState extends State<AdminPanel> {
       final apiService = Provider.of<ApiService>(context, listen: false);
       await apiService.deleteUser(id);
       _loadUsers(); // Refresh daftar user
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('User berhasil dihapus')),
       );
@@ -114,17 +114,18 @@ class _AdminPanelState extends State<AdminPanel> {
     }
   }
 
-  Future<void> _loadCities(String provinceId) async {
+  Future<void> _loadCities(String provinceName) async {
     try {
-      print('Loading cities for province ID: $provinceId'); // Log provinceId
+      print('Loading cities for province: $provinceName');
       final apiService = Provider.of<ApiService>(context, listen: false);
-      final cities = await apiService.getCities(provinceId);
-      print('Cities loaded: $cities'); // Log cities
-      setState(() => _cities = cities);
+      final citiesList = await apiService.getCities(provinceName);
+      setState(() {
+        _cities = citiesList;
+      });
     } catch (e) {
-      print('Error loading cities: $e'); // Log error
+      print('Error loading cities: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading cities: $e')),
+        SnackBar(content: Text('Gagal memuat daftar kota')),
       );
     }
   }
@@ -135,27 +136,55 @@ class _AdminPanelState extends State<AdminPanel> {
       (location) => location.userId == userId,
       orElse: () => UserLocation(userId: '', province: '', city: ''),
     );
-    
-    // Set nilai awal berdasarkan data yang ada (jika ada)
-    if (existingLocation.userId.isNotEmpty) {
-      _selectedProvince = existingLocation.province;
-      _selectedCity = existingLocation.city;
-      // Load cities untuk provinsi yang ada
-      await _loadCities(existingLocation.province);
-    } else {
+
+    // Reset nilai awal
+    setState(() {
       _selectedProvince = null;
       _selectedCity = null;
+    });
+
+    // Load data provinsi jika belum ada
+    if (_provinces.isEmpty) {
+      await _loadProvinces();
     }
 
-    // Tampilkan dialog setelah data siap
+    // Jika ada data existing, cari provinsi yang sesuai
+    if (existingLocation.userId.isNotEmpty) {
+      // Normalisasi nama provinsi yang ada di database
+      String normalizedExistingProvince = existingLocation.province
+          .toLowerCase()
+          .replaceAll('jakrta', 'jakarta')
+          .trim();
+
+      // Cari provinsi yang sesuai
+      final matchingProvince = _provinces.firstWhere(
+        (p) => p['name']?.toString().toLowerCase() == normalizedExistingProvince,
+        orElse: () => {'id': '', 'name': ''},
+      );
+
+      // Gunakan null-safe access dan null check
+      final provinceId = matchingProvince['id']?.toString();
+      final provinceName = matchingProvince['name']?.toString();
+      
+      if (provinceId != null && provinceId.isNotEmpty && provinceName != null) {
+        setState(() {
+          _selectedProvince = provinceId;
+        });
+        await _loadCities(provinceName);
+      }
+    }
+
+    // Tampilkan dialog
     if (!mounted) return;
     showDialog(
       context: context,
       builder: (context) {
-        return StatefulBuilder( // Gunakan StatefulBuilder untuk update state dalam dialog
+        return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: Text(existingLocation.userId.isNotEmpty ? 'Update Lokasi' : 'Tambah Lokasi'),
+              title: Text(existingLocation.userId.isNotEmpty
+                  ? 'Update Lokasi'
+                  : 'Tambah Lokasi'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -164,7 +193,7 @@ class _AdminPanelState extends State<AdminPanel> {
                     decoration: InputDecoration(labelText: 'Provinsi'),
                     items: _provinces.map((province) {
                       return DropdownMenuItem(
-                        value: province['name'],
+                        value: province['id'],
                         child: Text(province['name']!),
                       );
                     }).toList(),
@@ -172,105 +201,75 @@ class _AdminPanelState extends State<AdminPanel> {
                       setState(() {
                         _selectedProvince = value;
                         _selectedCity = null;
-                        _cities = [];
                       });
                       if (value != null) {
-                        await _loadCities(value);
-                        setState(() {}); // Refresh dialog setelah cities diload
+                        // Dapatkan nama provinsi dari ID yang dipilih
+                        final selectedProvinceName = _provinces
+                            .firstWhere((p) => p['id'] == value)['name']!;
+                        await _loadCities(selectedProvinceName);
+                        setState(() {});
                       }
                     },
                   ),
                   SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: _selectedCity,
-                    decoration: InputDecoration(labelText: 'Kota'),
-                    items: _cities.map((city) {
-                      return DropdownMenuItem(
-                        value: city['name'],
-                        child: Text(city['name']!),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() => _selectedCity = value);
-                    },
-                  ),
+                  if (_cities.isNotEmpty)
+                    DropdownButtonFormField<String>(
+                      value: _selectedCity,
+                      decoration: InputDecoration(labelText: 'Kota'),
+                      items: _cities.map((city) {
+                        return DropdownMenuItem(
+                          value: city['id'],
+                          child: Text(city['name']!),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() => _selectedCity = value);
+                      },
+                    ),
                 ],
               ),
               actions: [
                 TextButton(
-                  onPressed: () {
-                    // Reset nilai saat cancel
-                    _selectedProvince = null;
-                    _selectedCity = null;
-                    Navigator.of(context).pop();
-                  },
+                  onPressed: () => Navigator.of(context).pop(),
                   child: Text('Batal'),
                 ),
                 ElevatedButton(
                   onPressed: () async {
                     if (_selectedProvince != null && _selectedCity != null) {
-                      final apiService = Provider.of<ApiService>(context, listen: false);
-                      
                       try {
+                        final apiService = Provider.of<ApiService>(context, listen: false);
+                        
+                        // Dapatkan nama provinsi dan kota dari ID yang dipilih
+                        final provinceName = _provinces
+                            .firstWhere((p) => p['id'] == _selectedProvince)['name']!;
+                        final cityName = _cities
+                            .firstWhere((c) => c['id'] == _selectedCity)['name']!;
+
                         if (existingLocation.userId.isNotEmpty) {
-                          print('Updating location for user: $userId');
                           await apiService.updateUserLocation(
                             userId,
-                            _selectedProvince!,
-                            _selectedCity!,
+                            provinceName,
+                            cityName,
                           );
-                          
-                          setState(() {
-                            final index = userLocations.indexWhere((loc) => loc.userId == userId);
-                            if (index != -1) {
-                              userLocations[index] = UserLocation(
-                                userId: userId,
-                                province: _selectedProvince!,
-                                city: _selectedCity!,
-                              );
-                            } else {
-                              userLocations.add(UserLocation(
-                                userId: userId,
-                                province: _selectedProvince!,
-                                city: _selectedCity!,
-                              ));
-                            }
-                          });
-                          
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Lokasi berhasil diperbarui')),
-                          );
-                          Navigator.of(context).pop();
                         } else {
                           await apiService.addUserLocation(
                             userId,
-                            _selectedProvince!,
-                            _selectedCity!,
-                          );
-                          
-                          setState(() {
-                            userLocations.add(UserLocation(
-                              userId: userId,
-                              province: _selectedProvince!,
-                              city: _selectedCity!,
-                            ));
-                          });
-                          
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Lokasi berhasil ditambahkan')),
+                            provinceName,
+                            cityName,
                           );
                         }
+                        
+                        await _loadUserLocations();
                         Navigator.of(context).pop();
+                        
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Lokasi berhasil disimpan')),
+                        );
                       } catch (e) {
-                        print('Error updating location: $e');
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('Error: $e')),
                         );
                       }
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Pilih provinsi dan kota')),
-                      );
                     }
                   },
                   child: Text('Simpan'),
@@ -460,4 +459,4 @@ class _AdminPanelState extends State<AdminPanel> {
       ),
     );
   }
-} 
+}

@@ -150,7 +150,7 @@ class ApiService {
   Future<Map<String, dynamic>?> login(String username, String password) async {
     try {
       print('Attempting login for username: $username');
-      
+
       final response = await http.post(
         Uri.parse('$baseUrl/auth/login'),
         headers: {'Content-Type': 'application/json'},
@@ -210,7 +210,8 @@ class ApiService {
     }
   }
 
-  Future<void> addUserLocation(String userId, String province, String city) async {
+  Future<void> addUserLocation(
+      String userId, String province, String city) async {
     try {
       if (_token == null) throw Exception('No token available');
 
@@ -308,19 +309,32 @@ class ApiService {
   }
 
   Future<List<Map<String, String>>> getCities(String provinceId) async {
-    print('Fetching cities for province ID: $provinceId');
-    final response = await http.get(Uri.parse(
-        'https://jadwalsholat-silk.vercel.app/api/kota?provinsi=$provinceId'));
-    print('Response status: ${response.statusCode}');
-    print('Response body: ${response.body}');
-    if (response.statusCode == 200) {
-      final List<dynamic> data = json.decode(response.body)['data'];
-      return data
-          .map((item) =>
-              {'id': item['id'].toString(), 'name': item['name'].toString()})
-          .toList();
+    try {
+      print('Fetching cities for province ID: $provinceId');
+      
+      // Encode parameter provinsi untuk URL
+      final encodedProvinceId = Uri.encodeComponent(provinceId.toLowerCase());
+      final url = 'https://jadwalsholat-silk.vercel.app/api/kota?provinsi=$encodedProvinceId';
+      
+      print('Request URL: $url');
+      final response = await http.get(Uri.parse(url));
+      
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = json.decode(response.body);
+        final List<dynamic> data = jsonResponse['data'];
+        return data.map((city) => {
+          'id': city['id'].toString(),
+          'name': city['name'].toString(),
+        }).toList();
+      }
+      throw Exception('Failed to load cities');
+    } catch (e) {
+      print('Error loading cities: $e');
+      throw Exception('Failed to load cities');
     }
-    throw Exception('Failed to load cities');
   }
 
   Future<List<UserLocation>> getUserLocations() async {
@@ -343,20 +357,21 @@ class ApiService {
     }
   }
 
-  Future<void> updateUserLocation(String userId, String province, String city) async {
+  Future<void> updateUserLocation(
+      String userId, String province, String city) async {
     try {
       print('Updating location for userId: $userId');
       print('Data: province=$province, city=$city');
-      
+
       // Hanya kirim data yang diperlukan
       final requestBody = {
         'userId': userId,
         'province': province,
         'city': city,
       };
-      
+
       print('Request body: $requestBody'); // Tambah logging
-      
+
       final response = await http.post(
         Uri.parse('$baseUrl/user-locations/update-location'),
         headers: {
@@ -372,9 +387,11 @@ class ApiService {
       if (response.statusCode != 200) {
         try {
           final errorData = jsonDecode(response.body);
-          throw Exception(errorData['message'] ?? 'Gagal memperbarui lokasi pengguna');
+          throw Exception(
+              errorData['message'] ?? 'Gagal memperbarui lokasi pengguna');
         } catch (e) {
-          throw Exception('Gagal memperbarui lokasi pengguna: Status ${response.statusCode}');
+          throw Exception(
+              'Gagal memperbarui lokasi pengguna: Status ${response.statusCode}');
         }
       }
 
