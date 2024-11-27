@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const db = require('./config/database');
 require('dotenv').config();
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -11,11 +12,75 @@ const port = process.env.PORT || 3000;
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Length', 'Content-Type'],
+  credentials: true,
 }));
 app.use(express.json());
 app.use(express.static('public'));
-app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
+
+// Pastikan folder uploads ada dengan permission yang benar
+const uploadDir = path.join(__dirname, 'public', 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+  // Set permissions jika diperlukan
+  fs.chmodSync(uploadDir, '755');
+}
+
+// Serve static files
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
+
+// Tambahkan middleware untuk debugging
+app.use('/uploads', (req, res, next) => {
+  const filePath = path.join(__dirname, 'public', 'uploads', req.url);
+  console.log('Request URL:', req.url);
+  console.log('Full file path:', filePath);
+  console.log('File exists:', fs.existsSync(filePath));
+  
+  // Log file permissions
+  try {
+    const stats = fs.statSync(filePath);
+    console.log('File permissions:', stats.mode.toString(8));
+  } catch (err) {
+    console.log('Error checking file:', err);
+  }
+  
+  next();
+});
+
+// Tambahkan error handler untuk static files
+app.use((err, req, res, next) => {
+  console.error('Static file error:', err);
+  res.status(500).send('Error serving static file');
+});
+
+// Tambahkan route khusus untuk mengecek file
+app.get('/check-file/:filename', (req, res) => {
+  const filePath = path.join(__dirname, 'public', 'uploads', req.params.filename);
+  
+  if (fs.existsSync(filePath)) {
+    res.json({
+      exists: true,
+      stats: fs.statSync(filePath),
+      path: filePath
+    });
+  } else {
+    res.json({
+      exists: false,
+      searchedPath: filePath
+    });
+  }
+});
+
+// Tambahkan CORS header untuk static files
+app.use('/uploads', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  next();
+});
 
 // Create tables if not exist
 async function createTables() {

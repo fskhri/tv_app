@@ -10,19 +10,19 @@ class SyncService {
 
   SyncService(this._databaseService, this._authController);
 
-  Future<List<PrayerSchedule>> getPrayerTimes(String province, String city) async {
+  Future<List<PrayerSchedule>> getPrayerTimes(
+      String province, String city) async {
     try {
       final now = DateTime.now();
-      final response = await http.get(
-        Uri.parse(
-          'https://jadwalsholat-silk.vercel.app/api/cari?provinsi=$province&kota=$city&bulan=${now.month}&tahun=${now.year}'
-        )
-      );
+      final response = await http.get(Uri.parse(
+          'https://jadwalsholat-silk.vercel.app/api/cari?provinsi=$province&kota=$city&bulan=${now.month}&tahun=${now.year}'));
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> jsonResponse = json.decode(response.body);
         final List<dynamic> data = jsonResponse['data'];
-        return data.map((schedule) => PrayerSchedule.fromJson(schedule)).toList();
+        return data
+            .map((schedule) => PrayerSchedule.fromJson(schedule))
+            .toList();
       } else {
         throw Exception('Gagal mengambil jadwal sholat');
       }
@@ -38,26 +38,20 @@ class SyncService {
 
   Future<Map<String, String>> getUserLocation() async {
     // Return default location
-    return {
-      'province': 'dki jakarta',
-      'city': 'kota jakarta'
-    };
+    return {'province': 'dki jakarta', 'city': 'kota jakarta'};
   }
 
   Future<List<Map<String, String>>> getAvailableLocations() async {
     try {
-      final response = await http.get(
-        Uri.parse('https://jadwalsholat-silk.vercel.app/api/provinsi')
-      );
+      final response = await http
+          .get(Uri.parse('https://jadwalsholat-silk.vercel.app/api/provinsi'));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body)['data'];
-        return List<Map<String, String>>.from(
-          data.map((loc) => {
-            'province': loc['name'].toString().toLowerCase(),
-            'city': 'kota ${loc['name'].toString().toLowerCase()}'
-          })
-        );
+        return List<Map<String, String>>.from(data.map((loc) => {
+              'province': loc['name'].toString().toLowerCase(),
+              'city': 'kota ${loc['name'].toString().toLowerCase()}'
+            }));
       } else {
         throw Exception('Gagal mengambil daftar lokasi');
       }

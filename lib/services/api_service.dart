@@ -470,4 +470,102 @@ class ApiService {
       throw Exception('Error getting contents: $e');
     }
   }
+
+  Future<List<Map<String, dynamic>>> getAllContents() async {
+    try {
+      if (_token == null) throw Exception('No token available');
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/content'),
+        headers: _getHeaders(),
+      );
+
+      print(
+          'Get all contents response: ${response.statusCode} - ${response.body}');
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = json.decode(response.body);
+        if (jsonResponse['success'] == true) {
+          final contents =
+              List<Map<String, dynamic>>.from(jsonResponse['data']);
+
+          // Pastikan URL gambar menggunakan baseUrl yang benar
+          return contents.map((content) {
+            if (content['image_urls_full'] != null) {
+              content['image_urls_full'] =
+                  (content['image_urls_full'] as List).map((url) {
+                if (url.contains('localhost')) {
+                  return url.replaceFirst('http://localhost:3000', baseUrl);
+                }
+                return url;
+              }).toList();
+            }
+            return content;
+          }).toList();
+        }
+        throw Exception('Failed to get contents: ${jsonResponse['message']}');
+      }
+      throw Exception('Failed to get contents: ${response.body}');
+    } catch (e) {
+      print('Error getting contents: $e');
+      throw Exception('Error getting contents: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> uploadContentFile({
+    required File contentFile,
+    required String title,
+    required String description,
+  }) async {
+    try {
+      final uri = Uri.parse('${baseUrl}/content/upload');
+
+      var request = http.MultipartRequest('POST', uri);
+
+      // Tambahkan file ke request
+      var multipartFile =
+          await http.MultipartFile.fromPath('content', contentFile.path);
+      request.files.add(multipartFile);
+
+      // Tambahkan data lainnya
+      request.fields['title'] = title;
+      request.fields['description'] = description;
+
+      var response = await request.send();
+      var responseData = await response.stream.bytesToString();
+
+      if (response.statusCode == 201) {
+        return json.decode(responseData);
+      } else {
+        throw Exception('Gagal mengupload gambar');
+      }
+    } catch (e) {
+      throw Exception('Error: ${e.toString()}');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getUploadedImages(String userId) async {
+    try {
+      if (_token == null) throw Exception('No token available');
+
+      final response = await http.get(
+        Uri.parse('${baseUrl}/content/images/$userId'),
+        headers: _getHeaders(),
+      );
+
+      print('Get images response: ${response.statusCode} - ${response.body}');
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = json.decode(response.body);
+        if (jsonResponse['success'] == true) {
+          return List<Map<String, dynamic>>.from(jsonResponse['data']);
+        }
+        throw Exception('Failed to get images: ${jsonResponse['message']}');
+      }
+      throw Exception('Failed to get images: ${response.body}');
+    } catch (e) {
+      print('Error getting images: $e');
+      throw Exception('Error getting images: $e');
+    }
+  }
 }

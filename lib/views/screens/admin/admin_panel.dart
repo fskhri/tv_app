@@ -6,6 +6,7 @@ import '../../../models/user_location.dart';
 import '../../../controllers/auth_controller.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 
 class AdminPanel extends StatefulWidget {
   @override
@@ -39,6 +40,12 @@ class _AdminPanelState extends State<AdminPanel> {
 
   // Tambahkan property untuk menyimpan konten
   List<Map<String, dynamic>> _userContents = [];
+
+  File? _selectedFile;
+  final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _categoryController = TextEditingController();
+  final _durationController = TextEditingController();
 
   // LIFECYCLE METHODS
   // ================
@@ -174,91 +181,6 @@ class _AdminPanelState extends State<AdminPanel> {
     await _initializeExistingLocation(existingLocation);
 
     if (!mounted) return;
-    _showLocationDialog(userId, existingLocation);
-  }
-
-  UserLocation _findExistingLocation(String userId) {
-    return userLocations.firstWhere(
-      (location) => location.userId == userId,
-      orElse: () => UserLocation(userId: '', province: '', city: ''),
-    );
-  }
-
-  void _resetLocationSelection() {
-    setState(() {
-      _selectedProvince = null;
-      _selectedCity = null;
-    });
-  }
-
-  Future<void> _initializeExistingLocation(UserLocation location) async {
-    if (location.userId.isNotEmpty) {
-      final normalizedProvince = _normalizeProvinceName(location.province);
-      setState(() {
-        _selectedProvince = normalizedProvince;
-      });
-      await _loadCities(normalizedProvince);
-
-      if (location.city.isNotEmpty) {
-        setState(() {
-          _selectedCity = location.city;
-        });
-      }
-    }
-  }
-
-  String _normalizeProvinceName(String province) {
-    return province.toLowerCase().replaceAll('jakrta', 'jakarta').trim();
-  }
-
-  Map<String, String> _findMatchingProvince(String normalizedName) {
-    return _provinces.firstWhere(
-      (p) => p['name']?.toString().toLowerCase() == normalizedName,
-      orElse: () => {'id': '', 'name': ''},
-    );
-  }
-
-  Future<void> _setSelectedProvince(Map<String, String> province) async {
-    final id = province['id'];
-    final name = province['name'];
-
-    if (id != null && id.isNotEmpty && name != null) {
-      setState(() => _selectedProvince = id);
-      await _loadCities(name);
-    }
-  }
-
-  // UI COMPONENTS
-  // ============
-  Widget _buildDashboard() {
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Ringkasan', style: Theme.of(context).textTheme.headlineSmall),
-            SizedBox(height: 16),
-            Text('Total Users: ${_users.length}'),
-            Text('Admin: ${_users.where((u) => u.role == 'admin').length}'),
-            Text('Users: ${_users.where((u) => u.role == 'user').length}'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildUserManagement() {
-    return Column(
-      children: [
-        _buildUserForm(),
-        SizedBox(height: 16),
-        _buildUserList(),
-      ],
-    );
-  }
-
-  void _showLocationDialog(String userId, UserLocation existingLocation) {
     showDialog(
       context: context,
       builder: (context) {
@@ -347,57 +269,84 @@ class _AdminPanelState extends State<AdminPanel> {
     );
   }
 
-  Widget _buildUserForm() {
+  UserLocation _findExistingLocation(String userId) {
+    return userLocations.firstWhere(
+      (location) => location.userId == userId,
+      orElse: () => UserLocation(userId: '', province: '', city: ''),
+    );
+  }
+
+  void _resetLocationSelection() {
+    setState(() {
+      _selectedProvince = null;
+      _selectedCity = null;
+    });
+  }
+
+  Future<void> _initializeExistingLocation(UserLocation location) async {
+    if (location.userId.isNotEmpty) {
+      final normalizedProvince = _normalizeProvinceName(location.province);
+      setState(() {
+        _selectedProvince = normalizedProvince;
+      });
+      await _loadCities(normalizedProvince);
+
+      if (location.city.isNotEmpty) {
+        setState(() {
+          _selectedCity = location.city;
+        });
+      }
+    }
+  }
+
+  String _normalizeProvinceName(String province) {
+    return province.toLowerCase().replaceAll('jakrta', 'jakarta').trim();
+  }
+
+  Map<String, String> _findMatchingProvince(String normalizedName) {
+    return _provinces.firstWhere(
+      (p) => p['name']?.toString().toLowerCase() == normalizedName,
+      orElse: () => {'id': '', 'name': ''},
+    );
+  }
+
+  Future<void> _setSelectedProvince(Map<String, String> province) async {
+    final id = province['id'];
+    final name = province['name'];
+
+    if (id != null && id.isNotEmpty && name != null) {
+      setState(() => _selectedProvince = id);
+      await _loadCities(name);
+    }
+  }
+
+  // UI COMPONENTS
+  // ============
+  Widget _buildDashboard() {
     return Card(
       child: Padding(
         padding: EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Tambah User Baru',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              SizedBox(height: 16),
-              TextFormField(
-                controller: _usernameController,
-                decoration: InputDecoration(labelText: 'Username'),
-                validator: (value) =>
-                    value?.isEmpty ?? true ? 'Username wajib diisi' : null,
-              ),
-              SizedBox(height: 8),
-              TextFormField(
-                controller: _passwordController,
-                decoration: InputDecoration(labelText: 'Password'),
-                obscureText: true,
-                validator: (value) =>
-                    value?.isEmpty ?? true ? 'Password wajib diisi' : null,
-              ),
-              SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: _selectedRole,
-                decoration: InputDecoration(labelText: 'Role'),
-                items: ['admin', 'user'].map((role) {
-                  return DropdownMenuItem(
-                    value: role,
-                    child: Text(role),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() => _selectedRole = value!);
-                },
-              ),
-              SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _createUser,
-                child: Text('Tambah User'),
-              ),
-            ],
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Ringkasan', style: Theme.of(context).textTheme.headlineSmall),
+            SizedBox(height: 16),
+            Text('Total Users: ${_users.length}'),
+            Text('Admin: ${_users.where((u) => u.role == 'admin').length}'),
+            Text('Users: ${_users.where((u) => u.role == 'user').length}'),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildUserManagement() {
+    return Column(
+      children: [
+        _buildUserForm(),
+        SizedBox(height: 16),
+        _buildUserList(),
+      ],
     );
   }
 
@@ -417,30 +366,35 @@ class _AdminPanelState extends State<AdminPanel> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Tambahkan tombol lokasi
+                      IconButton(
+                        icon: Icon(Icons.location_on),
+                        onPressed: () => _showAddLocationDialog(user.id),
+                        tooltip: 'Set Lokasi',
+                      ),
                       IconButton(
                         icon: Icon(Icons.upload_file),
                         onPressed: () => _showUploadContentDialog(user.id),
                         tooltip: 'Upload Konten',
                       ),
                       IconButton(
-                        icon: Icon(Icons.location_on),
-                        onPressed: () => _showAddLocationDialog(user.id),
-                      ),
-                      IconButton(
                         icon: Icon(Icons.delete),
                         onPressed: () => _deleteUser(user.id),
+                        tooltip: 'Hapus User',
                       ),
                     ],
                   ),
-                  onExpansionChanged: (expanded) {
-                    if (expanded) {
-                      _loadUserContents(user.id);
-                    }
-                  },
                   children: [
                     Padding(
                       padding: EdgeInsets.all(16),
-                      child: _buildContentList(user.id),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildContentList(user.id),
+                          SizedBox(height: 16),
+                          _buildUploadedImages(user.id),
+                        ],
+                      ),
                     ),
                   ],
                 );
@@ -454,55 +408,48 @@ class _AdminPanelState extends State<AdminPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('User Contents', style: Theme.of(context).textTheme.titleLarge),
-        SizedBox(height: 8),
-        if (_isLoading)
-          Center(child: CircularProgressIndicator())
-        else if (_userContents.isEmpty)
-          Text('No contents found')
-        else
-          ListView.builder(
-            shrinkWrap: true,
-            physics: NeverScrollableScrollPhysics(),
-            itemCount: _userContents.length,
-            itemBuilder: (context, index) {
-              final content = _userContents[index];
-              return Card(
-                margin: EdgeInsets.symmetric(vertical: 4),
-                child: ListTile(
-                  title: Text(content['title']),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(content['description'] ?? ''),
-                      if (content['image_urls_full'] != null &&
-                          (content['image_urls_full'] as List).isNotEmpty)
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: (content['image_urls_full'] as List)
-                                .map((url) => Padding(
-                                      padding: EdgeInsets.all(4),
-                                      child: Image.network(
-                                        url,
-                                        height: 60,
-                                        width: 60,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    ))
-                                .toList(),
-                          ),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: NeverScrollableScrollPhysics(),
+          itemCount: _userContents.length,
+          itemBuilder: (context, index) {
+            final content = _userContents[index];
+            return Card(
+              margin: EdgeInsets.symmetric(vertical: 4),
+              child: ListTile(
+                title: Text(content['title']),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(content['description'] ?? ''),
+                    if (content['image_urls_full'] != null &&
+                        (content['image_urls_full'] as List).isNotEmpty)
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: (content['image_urls_full'] as List)
+                              .map((url) => Padding(
+                                    padding: EdgeInsets.all(4),
+                                    child: Image.network(
+                                      url,
+                                      height: 60,
+                                      width: 60,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ))
+                              .toList(),
                         ),
-                    ],
-                  ),
-                  trailing: IconButton(
-                    icon: Icon(Icons.delete),
-                    onPressed: () => _deleteContent(content['id']),
-                  ),
+                      ),
+                  ],
                 ),
-              );
-            },
-          ),
+                trailing: IconButton(
+                  icon: Icon(Icons.delete),
+                  onPressed: () => _deleteContent(content['id']),
+                ),
+              ),
+            );
+          },
+        ),
       ],
     );
   }
@@ -696,6 +643,226 @@ class _AdminPanelState extends State<AdminPanel> {
       print('Error picking images: $e');
       _showErrorSnackBar('Error memilih gambar: $e');
     }
+  }
+
+  Future<void> _uploadContent() async {
+    if (_formKey.currentState!.validate() && _selectedFile != null) {
+      try {
+        final apiService = Provider.of<ApiService>(context, listen: false);
+        final response = await apiService.uploadContentFile(
+          contentFile: _selectedFile!,
+          title: _titleController.text,
+          description: _descriptionController.text,
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gambar berhasil diupload')),
+        );
+
+        // Reset form
+        _formKey.currentState!.reset();
+        setState(() {
+          _selectedFile = null;
+        });
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal mengupload gambar: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickFile() async {
+    FilePickerResult? result = await FilePicker.platform
+        .pickFiles(type: FileType.image, allowMultiple: false);
+
+    if (result != null) {
+      setState(() {
+        _selectedFile = File(result.files.single.path!);
+      });
+    }
+  }
+
+  Widget _buildUploadedImages(String userId) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: Provider.of<ApiService>(context, listen: false)
+          .getUploadedImages(userId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return Center(child: Text('Belum ada gambar yang diupload'));
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'Gambar yang Sudah Diupload',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: 1,
+              ),
+              itemCount: snapshot.data!.length,
+              itemBuilder: (context, index) {
+                final image = snapshot.data![index];
+                return Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () => _showImageDetails(image),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: Image.network(
+                            image['imageUrl'],
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Center(child: Icon(Icons.error));
+                            },
+                          ),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.all(4),
+                          child: Text(
+                            image['title'] ?? 'No Title',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showImageDetails(Map<String, dynamic> image) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Container(
+          padding: EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                image['title'] ?? 'No Title',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              SizedBox(height: 8),
+              if (image['description'] != null) ...[
+                Text(
+                  image['description'],
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                SizedBox(height: 8),
+              ],
+              AspectRatio(
+                aspectRatio: 16 / 9,
+                child: Image.network(
+                  image['imageUrl'],
+                  fit: BoxFit.contain,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Diupload pada: ${DateTime.parse(image['uploadDate']).toLocal()}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text('Tutup'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Tambahkan method ini di dalam class _AdminPanelState
+  Widget _buildUserForm() {
+    return Card(
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Tambah User Baru',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              SizedBox(height: 16),
+              TextFormField(
+                controller: _usernameController,
+                decoration: InputDecoration(labelText: 'Username'),
+                validator: (value) =>
+                    value?.isEmpty ?? true ? 'Username wajib diisi' : null,
+              ),
+              SizedBox(height: 8),
+              TextFormField(
+                controller: _passwordController,
+                decoration: InputDecoration(labelText: 'Password'),
+                obscureText: true,
+                validator: (value) =>
+                    value?.isEmpty ?? true ? 'Password wajib diisi' : null,
+              ),
+              SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: _selectedRole,
+                decoration: InputDecoration(labelText: 'Role'),
+                items: ['admin', 'user'].map((role) {
+                  return DropdownMenuItem(
+                    value: role,
+                    child: Text(role),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() => _selectedRole = value!);
+                },
+              ),
+              SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _createUser,
+                child: Text('Tambah User'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   // BUILD METHOD

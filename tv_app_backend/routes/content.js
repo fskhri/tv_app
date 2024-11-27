@@ -9,15 +9,18 @@ const fs = require('fs');
 // Konfigurasi multer untuk upload gambar
 const storage = multer.diskStorage({
   destination: function(req, file, cb) {
-    const dir = 'public/uploads';
+    const dir = path.join(__dirname, '..', 'public', 'uploads');
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
+    console.log('Saving file to:', dir);
     cb(null, dir);
   },
   filename: function(req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'image-' + uniqueSuffix + path.extname(file.originalname));
+    const filename = 'image-' + uniqueSuffix + path.extname(file.originalname);
+    console.log('Generated filename:', filename);
+    cb(null, filename);
   }
 });
 
@@ -44,17 +47,29 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const upload = multer({
+// Buat instance multer untuk single upload
+const singleUpload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024
+    fileSize: 5 * 1024 * 1024 // 5MB
+  }
+});
+
+// Buat instance multer untuk multiple upload
+const multipleUpload = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB
   }
 }).array('images', 10);
 
-// POST /content - Create new content
+const baseUrl = 'https://0g7d00kv-3000.asse.devtunnels.ms';
+
+// POST /content - Create new content (multiple images)
 router.post('/', auth, (req, res) => {
-  upload(req, res, async function(err) {
+  multipleUpload(req, res, async function(err) {
     console.log('Upload request received');
     console.log('Files:', req.files);
     console.log('Body:', req.body);
@@ -90,20 +105,10 @@ router.post('/', auth, (req, res) => {
         console.log('Image URLs:', imageUrls);
       }
 
-      console.log('Executing database query with values:', {
-        userId,
-        title,
-        description,
-        imageUrls: imageUrls.join('|'),
-        type: 'image'
-      });
-
       const [result] = await db.query(
         'INSERT INTO contents (user_id, title, description, image_urls, type) VALUES (?, ?, ?, ?, ?)',
         [userId, title, description, imageUrls.join('|'), 'image']
       );
-
-      console.log('Content saved to database:', result);
 
       res.status(200).json({
         success: true,
@@ -112,24 +117,63 @@ router.post('/', auth, (req, res) => {
           id: result.insertId,
           title,
           description,
-          imageUrls: imageUrls.map(url => `${req.protocol}://${req.get('host')}/${url}`)
+          imageUrls: imageUrls.map(url => `${baseUrl}/${url}`)
         }
       });
     } catch (error) {
-      console.error('Database error details:', {
-        code: error.code,
-        errno: error.errno,
-        sqlMessage: error.sqlMessage,
-        sql: error.sql
-      });
-      
+      console.error('Database error:', error);
       res.status(500).json({
         success: false,
         message: 'Error saving content to database',
-        error: error.sqlMessage
+        error: error.message
       });
     }
   });
+});
+
+// POST /content/upload - Upload single image
+router.post('/upload', singleUpload.single('content'), async (req, res) => {
+  try {
+    const { title, description } = req.body;
+    const imageFile = req.file;
+
+    if (!imageFile) {
+      return res.status(400).json({ message: 'File gambar harus disertakan' });
+    }
+
+    // Simpan informasi konten ke database
+    const [result] = await db.query(
+      `INSERT INTO contents (
+        title, 
+        description,
+        image_urls,
+        type
+      ) VALUES (?, ?, ?, ?)`,
+      [
+        title,
+        description,
+        `uploads/${imageFile.filename}`,
+        'image'
+      ]
+    );
+
+    res.status(201).json({ 
+      message: 'Gambar berhasil diupload',
+      content: {
+        id: result.insertId,
+        title,
+        description,
+        imageUrl: `${baseUrl}/uploads/${imageFile.filename}`
+      }
+    });
+
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    res.status(500).json({ 
+      message: 'Gagal mengupload gambar',
+      error: error.message 
+    });
+  }
 });
 
 // GET /content/:userId - Get content by user ID
@@ -159,15 +203,19 @@ router.get('/:userId', auth, async (req, res) => {
     const transformedContents = contents.map(content => ({
       ...content,
       image_urls: content.image_urls ? content.image_urls.split('|') : [],
-      // Add full URL for each image
       image_urls_full: content.image_urls 
         ? content.image_urls.split('|').map(url => 
-            `${req.protocol}://${req.get('host')}/${url}`
+            `${baseUrl}/${url}`
           )
         : []
     }));
 
     console.log(`Found ${transformedContents.length} contents for user ${userId}`);
+
+    console.log('Generated image URLs:', transformedContents.map(content => ({
+      original: content.image_urls,
+      full: content.image_urls_full
+    })));
 
     res.json({
       success: true,
@@ -179,6 +227,103 @@ router.get('/:userId', auth, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching contents',
+      error: error.message
+    });
+  }
+});
+
+// GET /content - Get all contents
+router.get('/', auth, async (req, res) => {
+  try {
+    const [contents] = await db.query(
+      `SELECT 
+        id,
+        user_id,
+        title,
+        description,
+        image_urls,
+        type,
+        is_active,
+        created_at,
+        updated_at
+      FROM contents 
+      WHERE is_active = true
+      ORDER BY created_at DESC`
+    );
+
+    const transformedContents = contents.map(content => ({
+      ...content,
+      image_urls: content.image_urls ? content.image_urls.split('|') : [],
+      image_urls_full: content.image_urls 
+        ? content.image_urls.split('|').map(url => 
+            `${baseUrl}/${url}`
+          )
+        : []
+    }));
+
+    console.log('Transformed contents:', transformedContents.map(content => ({
+      id: content.id,
+      urls: content.image_urls_full
+    })));
+
+    res.json({
+      success: true,
+      data: transformedContents
+    });
+
+  } catch (error) {
+    console.error('Error fetching contents:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching contents',
+      error: error.message
+    });
+  }
+});
+
+// GET /content/images/:userId - Get uploaded images by user ID
+router.get('/images/:userId', auth, async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    console.log('Fetching images for userId:', userId);
+
+    const [images] = await db.query(
+      `SELECT 
+        id,
+        title,
+        description,
+        image_urls,
+        created_at
+      FROM contents 
+      WHERE user_id = ? 
+      AND type = 'image'
+      AND is_active = true
+      ORDER BY created_at DESC`,
+      [userId]
+    );
+
+    // Transform data dan tambahkan full URL untuk gambar
+    const transformedImages = images.map(image => ({
+      id: image.id,
+      title: image.title,
+      description: image.description,
+      uploadDate: image.created_at,
+      imageUrl: image.image_urls ? `${baseUrl}/${image.image_urls}` : null,
+      thumbnailUrl: image.image_urls ? `${baseUrl}/${image.image_urls}` : null
+    }));
+
+    console.log(`Found ${transformedImages.length} images for user ${userId}`);
+
+    res.json({
+      success: true,
+      data: transformedImages
+    });
+
+  } catch (error) {
+    console.error('Error fetching images:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching images',
       error: error.message
     });
   }

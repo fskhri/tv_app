@@ -5,6 +5,7 @@ import '../widgets/running_text_widget.dart';
 import '../../services/sync_service.dart';
 import '../../controllers/prayer_controller.dart';
 import 'dart:async';
+import '../widgets/content_slider.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
@@ -78,11 +79,11 @@ class _MainScreenState extends State<MainScreen> {
                       Expanded(
                         flex: 3,
                         child: Container(
-                          // TODO: Implementasi content slider
-                          color: Colors.grey[200],
-                          child: const Center(
-                            child: Text('Area Konten'),
+                          decoration: BoxDecoration(
+                            color: Colors.black,
+                            border: Border.all(color: Colors.grey[800]!),
                           ),
+                          child: ContentSlider(),
                         ),
                       ),
                     ],

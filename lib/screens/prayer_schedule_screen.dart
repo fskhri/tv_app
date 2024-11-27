@@ -27,7 +27,7 @@ class _PrayerScheduleScreenState extends State<PrayerScheduleScreen> {
     try {
       final location = await syncService.getUserLocation();
       final schedules = await syncService.getTodayPrayerSchedules();
-      
+
       setState(() {
         userLocation = location;
         todaySchedules = schedules;
@@ -35,9 +35,8 @@ class _PrayerScheduleScreenState extends State<PrayerScheduleScreen> {
       });
     } catch (e) {
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading schedules: $e'))
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error loading schedules: $e')));
     }
   }
 
@@ -60,7 +59,8 @@ class _PrayerScheduleScreenState extends State<PrayerScheduleScreen> {
             onPressed: () async {
               final result = await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => LocationSettingsScreen()),
+                MaterialPageRoute(
+                    builder: (context) => LocationSettingsScreen()),
               );
               if (result == true) {
                 setState(() => isLoading = true);
@@ -78,41 +78,41 @@ class _PrayerScheduleScreenState extends State<PrayerScheduleScreen> {
         ],
       ),
       body: isLoading
-        ? Center(child: CircularProgressIndicator())
-        : Column(
-            children: [
-              // Location info
-              Container(
-                padding: EdgeInsets.all(16),
-                color: Theme.of(context).primaryColor.withOpacity(0.1),
-                child: Row(
-                  children: [
-                    Icon(Icons.location_on),
-                    SizedBox(width: 8),
-                    Text(
-                      '${userLocation?['city'] ?? 'Loading...'}, ${userLocation?['province']}',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ],
+          ? Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                // Location info
+                Container(
+                  padding: EdgeInsets.all(16),
+                  color: Theme.of(context).primaryColor.withOpacity(0.1),
+                  child: Row(
+                    children: [
+                      Icon(Icons.location_on),
+                      SizedBox(width: 8),
+                      Text(
+                        '${userLocation?['city'] ?? 'Loading...'}, ${userLocation?['province']}',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              
-              // Prayer times list
-              Expanded(
-                child: ListView.builder(
-                  itemCount: todaySchedules.length,
-                  itemBuilder: (context, index) {
-                    final schedule = todaySchedules[index];
-                    return ListTile(
-                      leading: Icon(Icons.access_time),
-                      title: Text(schedule.prayerName),
-                      subtitle: Text(schedule.time),
-                    );
-                  },
+
+                // Prayer times list
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: todaySchedules.length,
+                    itemBuilder: (context, index) {
+                      final schedule = todaySchedules[index];
+                      return ListTile(
+                        leading: Icon(Icons.access_time),
+                        title: Text(schedule.prayerName),
+                        subtitle: Text(schedule.time),
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
     );
   }
-} 
+}
