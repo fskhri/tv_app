@@ -168,8 +168,16 @@ class _AdminPanelState extends State<AdminPanel> {
   Future<void> _initializeExistingLocation(UserLocation location) async {
     if (location.userId.isNotEmpty) {
       final normalizedProvince = _normalizeProvinceName(location.province);
-      final matchingProvince = _findMatchingProvince(normalizedProvince);
-      await _setSelectedProvince(matchingProvince);
+      setState(() {
+        _selectedProvince = normalizedProvince;
+      });
+      await _loadCities(normalizedProvince);
+      
+      if (location.city.isNotEmpty) {
+        setState(() {
+          _selectedCity = location.city;
+        });
+      }
     }
   }
 
@@ -242,8 +250,8 @@ class _AdminPanelState extends State<AdminPanel> {
                     decoration: InputDecoration(labelText: 'Provinsi'),
                     items: _provinces.map((province) {
                       return DropdownMenuItem(
-                        value: province['id'],
-                        child: Text(province['name']!),
+                        value: province['name'],
+                        child: Text(province['name']!.toLowerCase()),
                       );
                     }).toList(),
                     onChanged: (value) async {
@@ -252,9 +260,7 @@ class _AdminPanelState extends State<AdminPanel> {
                         _selectedCity = null;
                       });
                       if (value != null) {
-                        final provinceName = _provinces
-                            .firstWhere((p) => p['id'] == value)['name']!;
-                        await _loadCities(provinceName);
+                        await _loadCities(value);
                         setState(() {});
                       }
                     },
@@ -266,8 +272,8 @@ class _AdminPanelState extends State<AdminPanel> {
                       decoration: InputDecoration(labelText: 'Kota'),
                       items: _cities.map((city) {
                         return DropdownMenuItem(
-                          value: city['id'],
-                          child: Text(city['name']!),
+                          value: city['name'],
+                          child: Text(city['name']!.toLowerCase()),
                         );
                       }).toList(),
                       onChanged: (value) {
@@ -287,15 +293,10 @@ class _AdminPanelState extends State<AdminPanel> {
                       try {
                         final apiService = Provider.of<ApiService>(context, listen: false);
                         
-                        final provinceName = _provinces
-                            .firstWhere((p) => p['id'] == _selectedProvince)['name']!;
-                        final cityName = _cities
-                            .firstWhere((c) => c['id'] == _selectedCity)['name']!;
-
                         await apiService.saveUserLocation(
                           userId,
-                          provinceName,
-                          cityName,
+                          _selectedProvince!,
+                          _selectedCity!,
                         );
                         
                         await _loadUserLocations();
