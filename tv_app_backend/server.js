@@ -13,6 +13,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
+app.use(express.static('public'));
 
 // Create tables if not exist
 async function createTables() {
@@ -23,7 +24,9 @@ async function createTables() {
         username VARCHAR(50) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL,
         role ENUM('admin', 'user') DEFAULT 'user',
-        is_active BOOLEAN DEFAULT true
+        is_active BOOLEAN DEFAULT true,
+        running_text TEXT,
+        content_enabled BOOLEAN DEFAULT true
       )
     `);
     console.log('Users table ready');
@@ -53,6 +56,19 @@ async function createTables() {
       )
     `);
     console.log('User locations table ready');
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS contents (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        image_urls TEXT,
+        type ENUM('image', 'text', 'both') NOT NULL,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('Contents table created');
   } catch (err) {
     console.error('Error creating table:', err);
   }
@@ -96,6 +112,7 @@ app.use('/auth', require('./routes/auth'));
 app.use('/users', require('./routes/users'));
 app.use('/sync', require('./routes/sync'));
 app.use('/user-locations', require('./routes/user_locations'));
+app.use('/content', require('./routes/content'));
 
 // Test route
 app.get('/test', (req, res) => {

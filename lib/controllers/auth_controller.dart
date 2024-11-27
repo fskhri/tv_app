@@ -24,7 +24,7 @@ class AuthController extends ChangeNotifier {
 
   Future<String?> getToken() async {
     if (_token != null) return _token;
-    
+
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString(_tokenKey);
     print('Token retrieved from SharedPreferences: $_token');
@@ -42,18 +42,18 @@ class AuthController extends ChangeNotifier {
           role: userData['role'] as String,
           isActive: userData['isActive'] == true,
         );
-        
+
         _token = response['token'] as String;
         print('Token to be saved: $_token');
-        
+
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_tokenKey, _token!);
-        
+
         final savedToken = prefs.getString(_tokenKey);
         print('Token saved in SharedPreferences: $savedToken');
-        
+
         await _saveUserData(_currentUser!);
-        
+
         notifyListeners();
         return true;
       }
@@ -80,7 +80,7 @@ class AuthController extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final userData = prefs.getString(_userKey);
       final token = prefs.getString(_tokenKey);
-      
+
       print('Loading saved data - Token: $token, UserData: $userData');
 
       if (userData != null && token != null) {

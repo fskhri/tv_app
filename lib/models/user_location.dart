@@ -24,4 +24,4 @@ class UserLocation {
       'city': city,
     };
   }
-} 
+}

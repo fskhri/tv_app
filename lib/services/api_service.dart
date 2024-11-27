@@ -253,7 +253,9 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final List<dynamic> locationsData = json.decode(response.body);
-        return locationsData.map((data) => UserLocation.fromJson(data)).toList();
+        return locationsData
+            .map((data) => UserLocation.fromJson(data))
+            .toList();
       }
       throw Exception('Failed to load user locations');
     } catch (e) {
@@ -327,10 +329,11 @@ class ApiService {
     }
   }
 
-  Future<void> saveUserLocation(String userId, String province, String city) async {
+  Future<void> saveUserLocation(
+      String userId, String province, String city) async {
     try {
       print('Checking existing location for userId: $userId');
-      
+
       // Cek dulu apakah lokasi sudah ada di database
       final response = await http.get(
         Uri.parse('$baseUrl/user-locations/check/$userId'),
@@ -352,7 +355,8 @@ class ApiService {
           }),
         );
 
-        print('Update response: ${updateResponse.statusCode} - ${updateResponse.body}');
+        print(
+            'Update response: ${updateResponse.statusCode} - ${updateResponse.body}');
 
         if (updateResponse.statusCode != 200) {
           throw Exception('Failed to update location');
@@ -370,7 +374,8 @@ class ApiService {
           }),
         );
 
-        print('Create response: ${createResponse.statusCode} - ${createResponse.body}');
+        print(
+            'Create response: ${createResponse.statusCode} - ${createResponse.body}');
 
         if (createResponse.statusCode != 201) {
           throw Exception('Failed to create location');

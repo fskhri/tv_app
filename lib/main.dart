@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:get/get.dart';
 import 'services/database_service.dart';
 import 'views/screens/login_screen.dart';
 import 'controllers/auth_controller.dart';
@@ -13,7 +14,7 @@ import 'screens/prayer_schedule_screen.dart';
 import 'screens/home_screen.dart';
 import 'services/api_service.dart';
 import 'screens/user_management_screen.dart';
-import 'package:get/get.dart';
+import 'bindings/prayer_binding.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -56,7 +57,7 @@ void main() async {
           ),
         ),
       ],
-      child: GetMaterialApp(
+      child: MaterialApp(
         title: 'Adzan TV',
         theme: ThemeData(
           primarySwatch: Colors.green,

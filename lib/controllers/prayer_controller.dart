@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:just_audio/just_audio.dart' as just_audio;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
@@ -8,12 +10,11 @@ import 'package:intl/intl.dart';
 import '../services/database_service.dart';
 import '../services/api_service.dart';
 import '../helpers/database_helper.dart';
+import 'package:get/get.dart';
 
 class PrayerController extends ChangeNotifier {
   final ApiService _apiService = ApiService();
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
-
-  PrayerController();
 
   Map<String, DateTime>? _todayPrayers;
   List<Map<String, dynamic>>? _monthlySchedule;
@@ -21,9 +22,11 @@ class PrayerController extends ChangeNotifier {
   String? _selectedCity;
   bool _isLoading = false;
 
-  bool get isLoading => _isLoading;
+  int iqomahTimeInSeconds = 300;
+  Timer? iqomahTimer;
+  final player = just_audio.AudioPlayer();
 
-  // Getter untuk waktu sholat
+  bool get isLoading => _isLoading;
   DateTime? get imsak => _todayPrayers?['imsak'];
   DateTime? get subuh => _todayPrayers?['subuh'];
   DateTime? get terbit => _todayPrayers?['terbit'];
@@ -33,7 +36,6 @@ class PrayerController extends ChangeNotifier {
   DateTime? get maghrib => _todayPrayers?['maghrib'];
   DateTime? get isya => _todayPrayers?['isya'];
 
-  // Method untuk mendapatkan daftar provinsi
   Future<List<Map<String, dynamic>>> getProvinces() async {
     final response = await http
         .get(Uri.parse('https://jadwalsholat-silk.vercel.app/api/provinsi'));
@@ -45,7 +47,6 @@ class PrayerController extends ChangeNotifier {
     throw Exception('Failed to load provinces');
   }
 
-  // Method untuk mendapatkan daftar kota
   Future<List<Map<String, dynamic>>> getCities(String province) async {
     final response = await http.get(Uri.parse(
         'https://jadwalsholat-silk.vercel.app/api/kota?provinsi=$province'));
@@ -57,7 +58,6 @@ class PrayerController extends ChangeNotifier {
     throw Exception('Failed to load cities');
   }
 
-  // Method untuk mendapatkan lokasi dan update jadwal sholat
   Future<void> updatePrayerTimesByGPS() async {
     try {
       // Set default location untuk testing (Jakarta)
@@ -103,14 +103,12 @@ class PrayerController extends ChangeNotifier {
     }
   }
 
-  // Helper method untuk format nama provinsi
   String _formatProvinceName(String province) {
     // Konversi nama provinsi ke format yang sesuai dengan API
     // Contoh: "DKI JAKARTA" -> "dki jakarta"
     return province.toLowerCase();
   }
 
-  // Helper method untuk format nama kota
   String _formatCityName(String city) {
     // Konversi nama kota ke format yang sesuai dengan API
     // Tambahkan "kota" atau "kabupaten" sesuai kebutuhan
@@ -121,10 +119,11 @@ class PrayerController extends ChangeNotifier {
     return 'kota ${city.toLowerCase()}';
   }
 
-  // Method untuk update jadwal sholat
   Future<void> updatePrayerTimes(String province, String city) async {
     _selectedProvince = province;
     _selectedCity = city;
+    _isLoading = true;
+    notifyListeners();
 
     try {
       final now = DateTime.now();
@@ -145,7 +144,6 @@ class PrayerController extends ChangeNotifier {
       }
     } catch (e) {
       print('Error fetching online data: $e');
-      // Jika gagal ambil data online, coba ambil dari database lokal
       try {
         _monthlySchedule = await _dbHelper.getPrayerSchedules();
         if (_monthlySchedule != null && _monthlySchedule!.isNotEmpty) {
@@ -159,10 +157,12 @@ class PrayerController extends ChangeNotifier {
         throw Exception(
             'Failed to load prayer times from both online and local sources');
       }
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
-  // Method untuk update jadwal hari ini
   void _updateTodayPrayers() {
     if (_monthlySchedule == null) return;
 
@@ -184,7 +184,6 @@ class PrayerController extends ChangeNotifier {
     };
   }
 
-  // Helper method untuk parse waktu ke DateTime
   DateTime _parseTimeToDateTime(String timeStr, {int addDays = 0}) {
     final now = DateTime.now();
     final parts = timeStr.split(':');
@@ -197,7 +196,6 @@ class PrayerController extends ChangeNotifier {
     );
   }
 
-  // Method untuk mendapatkan waktu sholat berikutnya
   (DateTime?, String) getNextPrayer() {
     if (_todayPrayers == null) return (null, '');
 
@@ -245,15 +243,80 @@ class PrayerController extends ChangeNotifier {
     return (nextPrayer, nextPrayerName);
   }
 
-  // Method untuk mendapatkan countdown ke waktu sholat berikutnya
   Duration? getCountdown() {
     final (nextPrayer, _) = getNextPrayer();
     if (nextPrayer == null) return null;
 
-    return nextPrayer.difference(DateTime.now());
+    final difference = nextPrayer.difference(DateTime.now());
+    
+    // Jika countdown selesai, mainkan alarm dan mulai iqomah
+    if (difference.inSeconds <= 0) {
+      // Pastikan alarm hanya berbunyi sekali
+      if (!_isAlarmPlayed) {
+        _isAlarmPlayed = true;
+        playAdhanAlarm();
+      }
+    } else {
+      _isAlarmPlayed = false;
+    }
+
+    return difference;
   }
 
-  // Method untuk format countdown yang lebih informatif
+  bool _isAlarmPlayed = false;
+  bool _isIqomahAlarmPlayed = false;
+
+  void playAdhanAlarm() async {
+    try {
+      print('🔔 Memulai alarm adzan...');
+      await player.setAsset('lib/assets/sounds/bedside-clock-alarm-95792.mp3');
+      await player.play();
+      print('✅ Alarm adzan berhasil dibunyikan');
+      print('⏰ Memulai hitungan mundur iqomah (5 menit)');
+      startIqomahCountdown();
+    } catch (e) {
+      print('❌ Error saat membunyikan alarm adzan: $e');
+    }
+  }
+
+  void playIqomahAlarm() async {
+    try {
+      print('🔔 Memulai alarm iqomah...');
+      await player.setAsset('lib/assets/sounds/bedside-clock-alarm-95792.mp3');
+      await player.play();
+      print('✅ Alarm iqomah berhasil dibunyikan');
+    } catch (e) {
+      print('❌ Error saat membunyikan alarm iqomah: $e');
+    }
+  }
+
+  void startIqomahCountdown() {
+    iqomahTimer?.cancel();
+    iqomahTimeInSeconds = 300;
+    _isIqomahAlarmPlayed = false;
+    print('📝 Waktu iqomah tersisa: 5 menit');
+    notifyListeners();
+    
+    iqomahTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+      if (iqomahTimeInSeconds > 0) {
+        iqomahTimeInSeconds--;
+        // Log setiap menit
+        if (iqomahTimeInSeconds % 60 == 0) {
+          print('📝 Waktu iqomah tersisa: ${iqomahTimeInSeconds ~/ 60} menit');
+        }
+        notifyListeners();
+      } else {
+        // Ketika iqomah selesai, mainkan alarm kedua
+        if (!_isIqomahAlarmPlayed) {
+          _isIqomahAlarmPlayed = true;
+          playIqomahAlarm();
+          print('✅ Waktu iqomah telah selesai');
+        }
+        timer.cancel();
+      }
+    });
+  }
+
   String formatCountdown(Duration? duration) {
     if (duration == null) return '--:--:--';
 
@@ -268,7 +331,6 @@ class PrayerController extends ChangeNotifier {
     return '$hours:$minutes:$seconds';
   }
 
-  // Method untuk mendapatkan tanggal
   String getDate() {
     if (_monthlySchedule == null) return '';
     final now = DateTime.now();
@@ -303,5 +365,12 @@ class PrayerController extends ChangeNotifier {
         throw e;
       }
     }
+  }
+
+  @override
+  void dispose() {
+    iqomahTimer?.cancel();
+    player.dispose();
+    super.dispose();
   }
 }

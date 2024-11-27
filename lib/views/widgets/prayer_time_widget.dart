@@ -14,6 +14,12 @@ class _PrayerTimeWidgetState extends State<PrayerTimeWidget> {
   @override
   void initState() {
     super.initState();
+    // Inisialisasi data awal
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final controller = Provider.of<PrayerController>(context, listen: false);
+      controller.updatePrayerTimesByGPS();
+    });
+    
     _timer = Timer.periodic(Duration(seconds: 1), (_) {
       setState(() {});
     });

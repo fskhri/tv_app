@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../views/screens/main_screen.dart';
 import './main_screen.dart';
 import 'package:provider/provider.dart';
 import '../services/api_service.dart';
@@ -30,7 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => MainScreen(isAdmin: isAdmin),
+              builder: (context) => const MainScreen(),
             ),
           );
         } else {

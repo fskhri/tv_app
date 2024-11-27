@@ -29,7 +29,7 @@ class User {
       username: map['username'] as String,
       role: map['role'] as String,
       isActive: map['is_active'] == 1 || map['is_active'] == true,
-      createdAt: map['created_at'] != null 
+      createdAt: map['created_at'] != null
           ? DateTime.parse(map['created_at'] as String)
           : null,
     );
@@ -63,4 +63,4 @@ class User {
       createdAt: createdAt ?? this.createdAt,
     );
   }
-} 
+}
