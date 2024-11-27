@@ -43,42 +43,36 @@ router.post('/', async (req, res) => {
 });
 
 // Endpoint untuk memperbarui lokasi pengguna
-router.post('/update-location', async (req, res) => {
+router.post('/update', async (req, res) => {
     console.log('Received update request:', req.body);
     try {
-        const { userId, province, city } = req.body;
+        const { id, user_id, province, city } = req.body;
         
         // Validasi input
-        if (!userId || !province || !city) {
-            console.log('Validation failed:', { userId, province, city });
+        if (!user_id || !province || !city) {
+            console.log('Validation failed:', { user_id, province, city });
             return res.status(400).json({ 
                 success: false, 
-                message: 'userId, province, dan city harus diisi' 
+                message: 'user_id, province, dan city harus diisi' 
             });
         }
 
-        // Cek apakah lokasi sudah ada
-        const [existingLocation] = await db.query(
-            'SELECT * FROM user_locations WHERE user_id = ?',
-            [userId]
+        // Update lokasi
+        const [result] = await db.query(
+            'UPDATE user_locations SET province = ?, city = ? WHERE user_id = ?',
+            [province, city, user_id]
         );
 
-        let result;
-        if (existingLocation.length > 0) {
-            // Update existing location
-            [result] = await db.query(
-                'UPDATE user_locations SET province = ?, city = ? WHERE user_id = ?',
-                [province, city, userId]
-            );
-        } else {
-            // Insert new location
-            [result] = await db.query(
-                'INSERT INTO user_locations (user_id, province, city) VALUES (?, ?, ?)',
-                [userId, province, city]
-            );
-        }
-
         console.log('Database operation result:', result);
+
+        if (result.affectedRows === 0) {
+            // Jika tidak ada baris yang terupdate, berarti data belum ada
+            const [insertResult] = await db.query(
+                'INSERT INTO user_locations (user_id, province, city) VALUES (?, ?, ?)',
+                [user_id, province, city]
+            );
+            console.log('Insert result:', insertResult);
+        }
 
         return res.json({ 
             success: true, 

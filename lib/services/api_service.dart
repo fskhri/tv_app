@@ -244,21 +244,21 @@ class ApiService {
   Future<List<UserLocation>> fetchUserLocations() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/api/user-locations'),
+        Uri.parse('$baseUrl/user-locations'),
         headers: _getHeaders(),
       );
 
-      print(
-          'Fetch locations response: ${response.statusCode} - ${response.body}');
+      print('Fetch response status: ${response.statusCode}');
+      print('Fetch response body: ${response.body}');
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map((json) => UserLocation.fromJson(json)).toList();
+        final List<dynamic> locationsData = json.decode(response.body);
+        return locationsData.map((data) => UserLocation.fromJson(data)).toList();
       }
       throw Exception('Failed to load user locations');
     } catch (e) {
       print('Error fetching user locations: $e');
-      throw Exception('Gagal memuat daftar lokasi');
+      throw e;
     }
   }
 
@@ -327,38 +327,60 @@ class ApiService {
     }
   }
 
-  Future<void> saveUserLocation(
-      String userId, String province, String city) async {
+  Future<void> saveUserLocation(String userId, String province, String city) async {
     try {
-      final existingLocation = await getUserLocation(userId);
-      final endpoint = existingLocation != null
-          ? '$baseUrl/api/user-locations/$userId'
-          : '$baseUrl/api/user-locations';
-
-      final method = existingLocation != null ? http.put : http.post;
-
-      final response = await method(
-        Uri.parse(endpoint),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': _token != null ? 'Bearer $_token' : '',
-        },
-        body: jsonEncode({
-          if (existingLocation == null) 'user_id': userId,
-          'province': province,
-          'city': city,
-        }),
+      print('Checking existing location for userId: $userId');
+      
+      // Cek dulu apakah lokasi sudah ada di database
+      final response = await http.get(
+        Uri.parse('$baseUrl/user-locations/check/$userId'),
+        headers: _getHeaders(),
       );
 
-      print(
-          'Save location response: ${response.statusCode} - ${response.body}');
+      print('Check response: ${response.statusCode} - ${response.body}');
 
-      if (response.statusCode != 200 && response.statusCode != 201) {
-        throw Exception('Failed to save location');
+      if (response.statusCode == 200) {
+        // Lokasi sudah ada, lakukan update
+        print('Updating existing location for userId: $userId');
+        final updateResponse = await http.post(
+          Uri.parse('$baseUrl/user-locations/update'),
+          headers: _getHeaders(),
+          body: jsonEncode({
+            'user_id': userId,
+            'province': province,
+            'city': city,
+          }),
+        );
+
+        print('Update response: ${updateResponse.statusCode} - ${updateResponse.body}');
+
+        if (updateResponse.statusCode != 200) {
+          throw Exception('Failed to update location');
+        }
+      } else if (response.statusCode == 404) {
+        // Lokasi belum ada, buat baru
+        print('Creating new location for userId: $userId');
+        final createResponse = await http.post(
+          Uri.parse('$baseUrl/user-locations'),
+          headers: _getHeaders(),
+          body: jsonEncode({
+            'user_id': userId,
+            'province': province,
+            'city': city,
+          }),
+        );
+
+        print('Create response: ${createResponse.statusCode} - ${createResponse.body}');
+
+        if (createResponse.statusCode != 201) {
+          throw Exception('Failed to create location');
+        }
+      } else {
+        throw Exception('Failed to check existing location');
       }
     } catch (e) {
       print('Error saving location: $e');
-      throw Exception('Gagal menyimpan lokasi');
+      throw Exception('Gagal menyimpan lokasi: $e');
     }
   }
 }

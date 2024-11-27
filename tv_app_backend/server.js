@@ -95,8 +95,7 @@ app.use((req, res, next) => {
 app.use('/auth', require('./routes/auth'));
 app.use('/users', require('./routes/users'));
 app.use('/sync', require('./routes/sync'));
-const userLocationsRouter = require('./routes/user_locations');
-app.use('/api/user-locations', userLocationsRouter);
+app.use('/user-locations', require('./routes/user_locations'));
 
 // Test route
 app.get('/test', (req, res) => {
