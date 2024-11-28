@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- ... other configurations ... -->
+    
+    <!-- Tambahkan permissions ini -->
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Aplikasi membutuhkan akses ke galeri untuk memilih gambar</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Aplikasi membutuhkan akses ke kamera untuk mengambil foto</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Aplikasi membutuhkan akses ke mikrofon untuk video</string>
+    
+    <!-- ... -->
+</dict>
+</plist> 
