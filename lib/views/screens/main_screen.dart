@@ -55,7 +55,8 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _fetchRunningText() async {
-    final url = Uri.parse('https://0g7d00kv-3000.asse.devtunnels.ms/running-text/user-test');
+    final url = Uri.parse(
+        'https://0g7d00kv-3000.asse.devtunnels.ms/running-text/user-test');
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
@@ -116,9 +117,7 @@ class _MainScreenState extends State<MainScreen> {
                 ),
                 // Running text di bagian bawah
                 RunningTextWidget(
-                  text: _runningText.isNotEmpty
-                      ? _runningText
-                      : '',
+                  text: _runningText.isNotEmpty ? _runningText : '',
                 ),
               ],
             ),

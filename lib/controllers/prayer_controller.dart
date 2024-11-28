@@ -215,13 +215,22 @@ class PrayerController extends ChangeNotifier {
     if (nextPrayer == null) return null;
 
     final difference = nextPrayer.difference(DateTime.now());
-    
+
     // Jika countdown selesai, mainkan alarm dan mulai iqomah
     if (difference.inSeconds <= 0) {
       // Pastikan alarm hanya berbunyi sekali
       if (!_isAlarmPlayed) {
         _isAlarmPlayed = true;
         playAdhanAlarm();
+      }
+      // Jika iqomah selesai, periksa waktu sholat berikutnya
+      if (_isIqomahAlarmPlayed) {
+        _updateTodayPrayers(); // Update jadwal sholat hari ini
+        final (newNextPrayer, _) = getNextPrayer();
+        if (newNextPrayer != null && newNextPrayer.isAfter(DateTime.now())) {
+          _isAlarmPlayed = false; // Reset alarm untuk waktu sholat berikutnya
+          return newNextPrayer.difference(DateTime.now());
+        }
       }
     } else {
       _isAlarmPlayed = false;
@@ -263,7 +272,7 @@ class PrayerController extends ChangeNotifier {
     _isIqomahAlarmPlayed = false;
     print('📝 Waktu iqomah tersisa: 5 menit');
     notifyListeners();
-    
+
     iqomahTimer = Timer.periodic(Duration(seconds: 1), (timer) {
       if (iqomahTimeInSeconds > 0) {
         iqomahTimeInSeconds--;
