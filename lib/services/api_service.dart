@@ -6,11 +6,13 @@ import '../models/user.dart' as user_model;
 import 'dart:io';
 import 'package:http_parser/http_parser.dart';
 import 'package:path/path.dart' as path;
+import 'package:dio/dio.dart';
 
 class ApiService {
   static const String baseUrl = 'https://0g7d00kv-3000.asse.devtunnels.ms';
   static const String prayerApiUrl = 'https://jadwalsholat-silk.vercel.app/api';
   String? _token;
+  Dio _dio = Dio();
 
   void setToken(String token) {
     _token = token;
@@ -587,6 +589,71 @@ class ApiService {
     } catch (e) {
       print('Error deleting image: $e');
       throw Exception('Error menghapus gambar: $e');
+    }
+  }
+
+  Future<String> getRunningText(String userId) async {
+    try {
+      final response = await _dio.get('/running-text/$userId');
+      if (response.statusCode == 200) {
+        return response.data['running_text'] as String;
+      }
+      throw Exception('Gagal mengambil running text');
+    } catch (e) {
+      throw Exception('Error: $e');
+    }
+  }
+
+  // Update Running Text (Khusus Admin)
+  Future<bool> updateRunningText(String userId, String newText) async {
+    try {
+      print('=== UPDATE RUNNING TEXT START ===');
+      print('User ID: $userId');
+      print('New Text: $newText');
+      print('Token: ${_token?.substring(0, 10)}...');
+
+      if (_token == null) {
+        print('Error: Token not available');
+        throw Exception('No token available');
+      }
+
+      print('Sending request to: $baseUrl/running-text');
+      print('Headers: ${_getHeaders()}');
+      print('Request body: ${json.encode({
+            'running_text': newText,
+            'userId': userId,
+          })}');
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/running-text'),
+        headers: _getHeaders(),
+        body: json.encode({
+          'running_text': newText,
+          'userId': userId,
+        }),
+      );
+
+      print('Response status code: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        print('Update successful');
+        return true;
+      } else {
+        print('Update failed with status: ${response.statusCode}');
+        final errorData = json.decode(response.body);
+        print('Error data: $errorData');
+        throw Exception(
+            errorData['message'] ?? 'Gagal mengupdate running text');
+      }
+    } catch (e) {
+      print('=== ERROR UPDATING RUNNING TEXT ===');
+      print('Error type: ${e.runtimeType}');
+      print('Error details: $e');
+      print('Stack trace: ${StackTrace.current}');
+      throw Exception('Error updating running text: $e');
+    } finally {
+      print('=== UPDATE RUNNING TEXT END ===');
     }
   }
 }

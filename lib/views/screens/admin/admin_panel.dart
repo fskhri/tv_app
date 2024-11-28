@@ -47,6 +47,9 @@ class _AdminPanelState extends State<AdminPanel> {
   final _categoryController = TextEditingController();
   final _durationController = TextEditingController();
 
+  // Di dalam class _AdminPanelState, tambahkan controller baru
+  final _runningTextController = TextEditingController();
+
   // LIFECYCLE METHODS
   // ================
   @override
@@ -61,6 +64,7 @@ class _AdminPanelState extends State<AdminPanel> {
     _passwordController.dispose();
     _contentTitleController.dispose();
     _contentDescriptionController.dispose();
+    _runningTextController.dispose();
     super.dispose();
   }
 
@@ -323,20 +327,69 @@ class _AdminPanelState extends State<AdminPanel> {
   // UI COMPONENTS
   // ============
   Widget _buildDashboard() {
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Ringkasan', style: Theme.of(context).textTheme.headlineSmall),
-            SizedBox(height: 16),
-            Text('Total Users: ${_users.length}'),
-            Text('Admin: ${_users.where((u) => u.role == 'admin').length}'),
-            Text('Users: ${_users.where((u) => u.role == 'user').length}'),
-          ],
+    return Center(
+      child: Card(
+        elevation: 4,
+        child: Container(
+          constraints: BoxConstraints(maxWidth: 400), // Batasi lebar maksimal
+          padding: EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                'Ringkasan',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              SizedBox(height: 24),
+              _buildSummaryItem(
+                'Total Users',
+                _users.length.toString(),
+                Icons.people,
+              ),
+              SizedBox(height: 16),
+              _buildSummaryItem(
+                'Admin',
+                _users.where((u) => u.role == 'admin').length.toString(),
+                Icons.admin_panel_settings,
+              ),
+              SizedBox(height: 16),
+              _buildSummaryItem(
+                'Users',
+                _users.where((u) => u.role == 'user').length.toString(),
+                Icons.person,
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSummaryItem(String label, String value, IconData icon) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 24, color: Theme.of(context).primaryColor),
+            SizedBox(width: 12),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ],
+        ),
+        Text(
+          value,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).primaryColor,
+              ),
+        ),
+      ],
     );
   }
 
@@ -362,10 +415,32 @@ class _AdminPanelState extends State<AdminPanel> {
                 final user = _users[index];
                 return ExpansionTile(
                   title: Text(user.username),
-                  subtitle: Text('Role: ${user.role}'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Role: ${user.role}'),
+                      if (user.runningText != null &&
+                          user.runningText!.isNotEmpty)
+                        Text(
+                          'Running Text: ${user.runningText}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Tambahkan tombol running text
+                      IconButton(
+                        icon: Icon(Icons.text_fields),
+                        onPressed: () => _showRunningTextDialog(user),
+                        tooltip: 'Set Running Text',
+                      ),
                       // Tambahkan tombol lokasi
                       IconButton(
                         icon: Icon(Icons.location_on),
@@ -925,6 +1000,75 @@ class _AdminPanelState extends State<AdminPanel> {
     );
   }
 
+  // Tambahkan method untuk update running text
+  Future<void> _updateRunningText(String userId, String newText) async {
+    try {
+      print('=== ADMIN PANEL UPDATE RUNNING TEXT START ===');
+      print('User ID: $userId');
+      print('New Text: $newText');
+
+      final apiService = Provider.of<ApiService>(context, listen: false);
+
+      print('Calling API service updateRunningText...');
+      await apiService.updateRunningText(userId, newText);
+
+      print('Update successful, showing success message...');
+      _showSuccessSnackBar('Running text berhasil diperbarui');
+
+      print('Reloading users...');
+      await _loadUsers();
+
+      print('=== ADMIN PANEL UPDATE RUNNING TEXT END ===');
+    } catch (e) {
+      print('=== ADMIN PANEL UPDATE RUNNING TEXT ERROR ===');
+      print('Error type: ${e.runtimeType}');
+      print('Error details: $e');
+      print('Stack trace: ${StackTrace.current}');
+      _showErrorSnackBar('Gagal memperbarui running text: $e');
+    }
+  }
+
+  // Tambahkan method untuk menampilkan dialog running text
+  void _showRunningTextDialog(User user) {
+    _runningTextController.text = user.runningText ?? '';
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Update Running Text'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('User: ${user.username}'),
+            SizedBox(height: 16),
+            TextField(
+              controller: _runningTextController,
+              decoration: InputDecoration(
+                labelText: 'Running Text',
+                border: OutlineInputBorder(),
+                hintText: 'Masukkan text yang akan berjalan',
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              _updateRunningText(user.id, _runningTextController.text);
+              Navigator.pop(context);
+            },
+            child: Text('Simpan'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // BUILD METHOD
   // ===========
   @override
@@ -942,33 +1086,26 @@ class _AdminPanelState extends State<AdminPanel> {
           ),
         ],
       ),
-      body: Row(
-        children: [
-          NavigationRail(
-            selectedIndex: _selectedIndex,
-            onDestinationSelected: (index) {
-              setState(() => _selectedIndex = index);
-            },
-            destinations: [
-              NavigationRailDestination(
-                icon: Icon(Icons.dashboard),
-                label: Text('Dashboard'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.people),
-                label: Text('User Management'),
-              ),
-            ],
+      body: Padding(
+        padding: EdgeInsets.all(16),
+        child: SingleChildScrollView(
+          child:
+              _selectedIndex == 0 ? _buildDashboard() : _buildUserManagement(),
+        ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) {
+          setState(() => _selectedIndex = index);
+        },
+        items: [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard),
+            label: 'Dashboard',
           ),
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: SingleChildScrollView(
-                child: _selectedIndex == 0
-                    ? _buildDashboard()
-                    : _buildUserManagement(),
-              ),
-            ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.people),
+            label: 'User Management',
           ),
         ],
       ),

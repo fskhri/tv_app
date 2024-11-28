@@ -182,6 +182,8 @@ app.use('/users', require('./routes/users'));
 app.use('/sync', require('./routes/sync'));
 app.use('/user-locations', require('./routes/user_locations'));
 app.use('/content', require('./routes/content'));
+const runningTextRouter = require('./routes/running-text');
+app.use('/running-text', runningTextRouter);
 
 // Test route
 app.get('/test', (req, res) => {

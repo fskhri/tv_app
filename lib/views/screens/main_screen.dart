@@ -6,6 +6,8 @@ import '../../services/sync_service.dart';
 import '../../controllers/prayer_controller.dart';
 import 'dart:async';
 import '../widgets/content_slider.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
@@ -17,12 +19,14 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   Timer? _syncTimer;
   bool _isLoading = true;
+  String _runningText = '';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeData();
+      _fetchRunningText();
     });
 
     // Coba sync setiap 5 menit
@@ -37,8 +41,7 @@ class _MainScreenState extends State<MainScreen> {
     if (!mounted) return;
 
     try {
-      final prayerController =
-          Provider.of<PrayerController>(context, listen: false);
+      Provider.of<PrayerController>(context, listen: false);
       // await prayerController.updatePrayerTimesByGPS();
     } catch (e) {
       if (!mounted) return;
@@ -48,6 +51,28 @@ class _MainScreenState extends State<MainScreen> {
     } finally {
       if (!mounted) return;
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _fetchRunningText() async {
+    final url = Uri.parse('https://0g7d00kv-3000.asse.devtunnels.ms/running-text/user-test');
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success']) {
+          setState(() {
+            _runningText = data['running_text'];
+          });
+        }
+      } else {
+        throw Exception('Failed to load running text');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memuat teks berjalan: $e')),
+      );
     }
   }
 
@@ -91,8 +116,9 @@ class _MainScreenState extends State<MainScreen> {
                 ),
                 // Running text di bagian bawah
                 RunningTextWidget(
-                  text:
-                      'Selamat datang di Masjid Al-Ikhlas. Jadwal kajian setiap hari Ahad ba\'da Subuh.',
+                  text: _runningText.isNotEmpty
+                      ? _runningText
+                      : '',
                 ),
               ],
             ),

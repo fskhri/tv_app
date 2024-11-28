@@ -4,6 +4,7 @@ class User {
   final String role;
   final bool isActive;
   final DateTime? createdAt;
+  final String? runningText;
 
   User({
     required this.id,
@@ -11,6 +12,7 @@ class User {
     required this.role,
     this.isActive = true,
     this.createdAt,
+    this.runningText,
   });
 
   Map<String, dynamic> toMap() {
@@ -20,6 +22,7 @@ class User {
       'role': role,
       'is_active': isActive ? 1 : 0,
       'created_at': createdAt?.toIso8601String(),
+      'running_text': runningText,
     };
   }
 
@@ -32,6 +35,7 @@ class User {
       createdAt: map['created_at'] != null
           ? DateTime.parse(map['created_at'] as String)
           : null,
+      runningText: map['running_text'] as String?,
     );
   }
 
@@ -45,6 +49,7 @@ class User {
       role: role,
       isActive: true,
       createdAt: DateTime.now(),
+      runningText: null,
     );
   }
 
@@ -54,6 +59,7 @@ class User {
     String? role,
     bool? isActive,
     DateTime? createdAt,
+    String? runningText,
   }) {
     return User(
       id: id ?? this.id,
@@ -61,6 +67,7 @@ class User {
       role: role ?? this.role,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
+      runningText: runningText ?? this.runningText,
     );
   }
 }

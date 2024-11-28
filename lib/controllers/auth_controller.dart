@@ -18,6 +18,8 @@ class AuthController extends ChangeNotifier {
 
   User? get currentUser => _currentUser;
 
+  String? get currentUserId => _currentUser?.id;
+
   Future<void> init() async {
     await _loadSavedUser();
   }
@@ -27,7 +29,9 @@ class AuthController extends ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString(_tokenKey);
-    print('Token retrieved from SharedPreferences: $_token');
+    if (_token != null) {
+      _apiService.setToken(_token!);
+    }
     return _token;
   }
 
@@ -44,13 +48,10 @@ class AuthController extends ChangeNotifier {
         );
 
         _token = response['token'] as String;
-        print('Token to be saved: $_token');
+        _apiService.setToken(_token!);
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_tokenKey, _token!);
-
-        final savedToken = prefs.getString(_tokenKey);
-        print('Token saved in SharedPreferences: $savedToken');
 
         await _saveUserData(_currentUser!);
 
@@ -116,5 +117,13 @@ class AuthController extends ChangeNotifier {
     _currentUser = null;
     _token = null;
     notifyListeners();
+  }
+
+  Future<Map<String, String>> getHeaders() async {
+    return {
+      'Content-Type': 'application/json',
+      // Tambahkan header authorization jika diperlukan
+      // 'Authorization': 'Bearer ${await getToken()}'
+    };
   }
 }

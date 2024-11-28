@@ -26,6 +26,8 @@ dependencies:
   just_audio: ^0.9.42
   image_picker: ^1.0.7
   carousel_slider: ^5.0.0
+  marquee: ^2.2.3
+  dio: ^5.7.0
 
 dev_dependencies:
   flutter_test:
